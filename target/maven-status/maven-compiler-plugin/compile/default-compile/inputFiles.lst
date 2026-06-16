@@ -1,0 +1,12 @@
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/TransactionPlatformApplication.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/CorrelationIdFilter.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/DashboardController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/GlobalExceptionHandler.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/HealthController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/config/SecurityConfig.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/AppUser.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/DatabaseUserDetailsService.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/Role.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/RoleRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/TestUserInitializer.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/UserRepository.java
