@@ -4,11 +4,13 @@ import com.enterprise.audit.AuditService;
 import com.enterprise.ledger.LedgerService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.enterprise.reliability.Reliable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+
 
 @Service
 public class TransactionService {
@@ -26,6 +28,7 @@ public class TransactionService {
     }
 
     @Transactional
+    @Reliable
     public PaymentResponse processPayment(PaymentRequest request, String idempotencyKey) {
         // 1. Check idempotency
         Optional<Transaction> existing = transactionRepository.findByIdempotencyKey(idempotencyKey);
