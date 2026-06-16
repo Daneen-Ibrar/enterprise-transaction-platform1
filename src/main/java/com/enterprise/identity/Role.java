@@ -34,4 +34,14 @@ public class Role {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Set<AppUser> getUsers() { return users; }
     public void setUsers(Set<AppUser> users) { this.users = users; }
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+    name = "role_permission",
+    joinColumns = @JoinColumn(name = "role_id"),
+    inverseJoinColumns = @JoinColumn(name = "permission_id")
+)
+private Set<Permission> permissions = new HashSet<>();
+
+public Set<Permission> getPermissions() { return permissions; }
+public void setPermissions(Set<Permission> permissions) { this.permissions = permissions; }
 }

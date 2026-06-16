@@ -6,6 +6,8 @@ com/enterprise/transaction/PaymentRequest.class
 com/enterprise/idempotency/IdempotencyRepository.class
 com/enterprise/transaction/TransactionService.class
 com/enterprise/transaction/PaymentResponse.class
+com/enterprise/identity/PermissionRepository.class
+com/enterprise/security/CustomPermissionEvaluator.class
 com/enterprise/transaction/TransactionStatus.class
 com/enterprise/ledger/LedgerRepository.class
 com/enterprise/transaction/Transaction.class
@@ -13,9 +15,11 @@ com/enterprise/api/HealthController.class
 com/enterprise/config/SecurityConfig.class
 com/enterprise/TransactionPlatformApplication.class
 com/enterprise/identity/RoleRepository.class
+com/enterprise/identity/PermissionService.class
 com/enterprise/ledger/LedgerService.class
 com/enterprise/api/GlobalExceptionHandler.class
 com/enterprise/identity/DatabaseUserDetailsService.class
+com/enterprise/identity/Permission.class
 com/enterprise/api/CorrelationIdFilter.class
 com/enterprise/identity/TestUserInitializer.class
 com/enterprise/transaction/TransactionRepository.class

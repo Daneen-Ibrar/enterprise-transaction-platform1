@@ -4,6 +4,7 @@ import com.enterprise.transaction.PaymentRequest;
 import com.enterprise.transaction.PaymentResponse;
 import com.enterprise.transaction.TransactionService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +22,7 @@ public class PaymentController {
     }
 
     @PostMapping("/api/payments")
+    // @PreAuthorize("hasPermission(#request, 'payment:process')")   // Requires 'payment:process' permission
     public ResponseEntity<PaymentResponse> processPayment(
             @Valid @RequestBody PaymentRequest request,
             @RequestHeader(value = "Idempotency-Key", required = true) String idempotencyKey) {

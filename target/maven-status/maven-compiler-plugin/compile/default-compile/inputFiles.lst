@@ -10,6 +10,9 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/idempotency/IdempotencyRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/AppUser.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/DatabaseUserDetailsService.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/Permission.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/PermissionRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/PermissionService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/Role.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/RoleRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/TestUserInitializer.java
@@ -18,6 +21,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/LedgerEntry.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/LedgerRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/LedgerService.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/security/CustomPermissionEvaluator.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/transaction/PaymentRequest.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/transaction/PaymentResponse.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/transaction/Transaction.java
