@@ -1,5 +1,6 @@
 com/enterprise/api/PaymentController.class
 com/enterprise/ledger/LedgerEntry.class
+com/enterprise/audit/AuditEventDTO.class
 com/enterprise/idempotency/IdempotencyKey.class
 com/enterprise/identity/UserRepository.class
 com/enterprise/transaction/PaymentRequest.class
@@ -10,6 +11,8 @@ com/enterprise/identity/PermissionRepository.class
 com/enterprise/security/CustomPermissionEvaluator.class
 com/enterprise/transaction/TransactionStatus.class
 com/enterprise/ledger/LedgerRepository.class
+com/enterprise/audit/AuditEvent.class
+com/enterprise/api/AuditController.class
 com/enterprise/transaction/Transaction.class
 com/enterprise/api/HealthController.class
 com/enterprise/config/SecurityConfig.class
@@ -19,6 +22,7 @@ com/enterprise/identity/PermissionService.class
 com/enterprise/ledger/LedgerService.class
 com/enterprise/api/GlobalExceptionHandler.class
 com/enterprise/identity/DatabaseUserDetailsService.class
+com/enterprise/audit/AuditRepository.class
 com/enterprise/identity/Permission.class
 com/enterprise/api/CorrelationIdFilter.class
 com/enterprise/identity/TestUserInitializer.class
