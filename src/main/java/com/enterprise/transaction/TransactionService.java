@@ -2,15 +2,14 @@ package com.enterprise.transaction;
 
 import com.enterprise.audit.AuditService;
 import com.enterprise.ledger.LedgerService;
+import com.enterprise.notification.NotificationService;   // <-- ADDED
+import com.enterprise.reliability.Reliable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.enterprise.reliability.Reliable;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
-
 
 @Service
 public class TransactionService {
@@ -18,13 +17,16 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final LedgerService ledgerService;
     private final AuditService auditService;
+    private final NotificationService notificationService;   // <-- ADDED
 
     public TransactionService(TransactionRepository transactionRepository,
                               LedgerService ledgerService,
-                              AuditService auditService) {
+                              AuditService auditService,
+                              NotificationService notificationService) {   // <-- ADDED
         this.transactionRepository = transactionRepository;
         this.ledgerService = ledgerService;
         this.auditService = auditService;
+        this.notificationService = notificationService;   // <-- ADDED
     }
 
     @Transactional
@@ -76,7 +78,24 @@ public class TransactionService {
             )
         );
 
-        // 7. Return response
+        // 7. Create notifications
+        notificationService.createNotification(
+            request.getCustomerId(),
+            "PAYMENT_SENT",
+            "Payment Sent",
+            String.format("You paid %.2f to merchant %d (Invoice %d)", amount, request.getMerchantId(), request.getInvoiceId()),
+            "/transactions/" + transaction.getId()
+        );
+
+        notificationService.createNotification(
+            request.getMerchantId(),
+            "PAYMENT_RECEIVED",
+            "Payment Received",
+            String.format("Customer %d paid %.2f (Invoice %d)", request.getCustomerId(), amount, request.getInvoiceId()),
+            "/transactions/" + transaction.getId()
+        );
+
+        // 8. Return response
         return new PaymentResponse(
             transaction.getId(),
             transaction.getStatus().name(),
@@ -84,7 +103,6 @@ public class TransactionService {
         );
     }
 
-    // For future use – retrieve transaction by ID
     public Optional<Transaction> findById(Long id) {
         return transactionRepository.findById(id);
     }

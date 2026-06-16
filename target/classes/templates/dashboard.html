@@ -7,11 +7,37 @@
         .card { border: 1px solid #ddd; padding: 20px; margin: 10px; border-radius: 8px; display: inline-block; min-width: 180px; }
         .card-number { font-size: 2em; font-weight: bold; }
         .card-label { color: #666; }
+        .notification-bell { position: relative; }
+        .badge { background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 12px; position: absolute; top: -8px; right: -8px; }
+        .dropdown { display: none; position: absolute; background: white; border: 1px solid #ccc; padding: 10px; min-width: 300px; right: 0; z-index: 100; }
+        .dropdown.show { display: block; }
+        .notification-item { padding: 5px 0; border-bottom: 1px solid #eee; }
+        .notification-item .title { font-weight: bold; }
+        .notification-item .time { font-size: 0.8em; color: #888; }
     </style>
 </head>
 <body>
     <h1>Welcome, <span sec:authentication="name">User</span></h1>
     <p>Your roles: <span sec:authentication="authorities">ROLES</span></p>
+
+    <!-- Notification Bell -->
+    <div class="notification-bell" style="float: right;">
+        <span onclick="toggleNotifications()" style="cursor: pointer; font-size: 24px;">🔔</span>
+        <span class="badge" th:text="${unreadCount}" th:if="${unreadCount > 0}">0</span>
+        <div id="notificationDropdown" class="dropdown">
+            <h4>Notifications</h4>
+            <div th:if="${notifications.empty}">
+                <p>No new notifications</p>
+            </div>
+            <div th:each="notif : ${notifications}" class="notification-item">
+                <div class="title" th:text="${notif.title}">Title</div>
+                <div th:text="${notif.message}">Message</div>
+                <div class="time" th:text="${notif.createdAt}">2026-01-01</div>
+                <a th:if="${notif.link}" th:href="${notif.link}">View</a>
+            </div>
+            <a href="/notifications/mark-read" th:if="${unreadCount > 0}">Mark all as read</a>
+        </div>
+    </div>
 
     <div style="display: flex; flex-wrap: wrap;">
         <div class="card">
@@ -48,5 +74,19 @@
     <form method="post" th:action="@{/logout}">
         <button type="submit">Logout</button>
     </form>
+
+    <script>
+        function toggleNotifications() {
+            var dropdown = document.getElementById('notificationDropdown');
+            dropdown.classList.toggle('show');
+        }
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            var bell = document.querySelector('.notification-bell');
+            if (!bell.contains(event.target)) {
+                document.getElementById('notificationDropdown').classList.remove('show');
+            }
+        });
+    </script>
 </body>
 </html>

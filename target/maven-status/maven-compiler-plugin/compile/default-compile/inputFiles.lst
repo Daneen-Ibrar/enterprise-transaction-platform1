@@ -1,4 +1,5 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/TransactionPlatformApplication.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminInvoiceController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReconciliationController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReliabilityController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminViewController.java
@@ -7,6 +8,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/DashboardController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/GlobalExceptionHandler.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/HealthController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/InvoiceController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PaymentController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/audit/AuditEvent.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/audit/AuditEventDTO.java
@@ -24,10 +26,17 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/RoleRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/TestUserInitializer.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/identity/UserRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/invoice/Invoice.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/invoice/InvoiceRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/invoice/InvoiceService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/EntryType.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/LedgerEntry.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/LedgerRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ledger/LedgerService.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/Notification.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/NotificationController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/NotificationRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/NotificationService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/reconciliation/ReconciliationDetail.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/reconciliation/ReconciliationDetailRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/reconciliation/ReconciliationRecord.java
