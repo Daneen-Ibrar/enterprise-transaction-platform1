@@ -47,6 +47,7 @@ com/enterprise/reliability/ReliabilityAspect.class
 com/enterprise/identity/DatabaseUserDetailsService.class
 com/enterprise/audit/AuditRepository.class
 com/enterprise/identity/Permission.class
+com/enterprise/api/AdminViewController.class
 com/enterprise/reliability/BackoffPolicyRepository.class
 com/enterprise/transaction/TransactionRepository.class
 com/enterprise/identity/AppUser.class

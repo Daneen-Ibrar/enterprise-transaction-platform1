@@ -5,4 +5,5 @@ import java.util.List;
 
 public interface DlqEntryRepository extends JpaRepository<DlqEntry, Long> {
     List<DlqEntry> findByStatus(String status);
+    long countByStatus(String status);
 }

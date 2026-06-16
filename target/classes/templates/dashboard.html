@@ -3,10 +3,48 @@
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <title>Dashboard</title>
+    <style>
+        .card { border: 1px solid #ddd; padding: 20px; margin: 10px; border-radius: 8px; display: inline-block; min-width: 180px; }
+        .card-number { font-size: 2em; font-weight: bold; }
+        .card-label { color: #666; }
+    </style>
 </head>
 <body>
     <h1>Welcome, <span sec:authentication="name">User</span></h1>
     <p>Your roles: <span sec:authentication="authorities">ROLES</span></p>
+
+    <div style="display: flex; flex-wrap: wrap;">
+        <div class="card">
+            <div class="card-number" th:text="${totalTransactions}">0</div>
+            <div class="card-label">Total Transactions</div>
+        </div>
+        <div class="card">
+            <div class="card-number" th:text="${totalAuditEvents}">0</div>
+            <div class="card-label">Audit Events</div>
+        </div>
+        <div class="card">
+            <div class="card-number" th:text="${pendingDlq}">0</div>
+            <div class="card-label">Pending DLQ</div>
+        </div>
+        <div class="card">
+            <div class="card-number" th:text="${reconciled}">0</div>
+            <div class="card-label">Reconciliations</div>
+        </div>
+    </div>
+
+    <hr/>
+
+    <h2>Admin Links</h2>
+    <ul>
+        <li><a href="/admin/transactions">View All Transactions</a></li>
+        <li><a href="/admin/audit">View Audit Log</a></li>
+        <li><a href="/admin/reconciliation">Reconciliation Reports</a></li>
+        <li sec:authorize="hasRole('ADMIN')"><a href="/admin/dlq">Dead Letter Queue</a></li>
+        <li sec:authorize="hasRole('ADMIN')"><a href="/admin/reliability/dlq">Reliability DLQ (API)</a></li>
+    </ul>
+
+    <hr/>
+
     <form method="post" th:action="@{/logout}">
         <button type="submit">Logout</button>
     </form>
