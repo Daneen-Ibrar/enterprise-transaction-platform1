@@ -14,7 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)  // Enables @PreAuthorize
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final CustomPermissionEvaluator customPermissionEvaluator;
@@ -26,10 +26,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/admin/**"))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/css/**", "/health/**").permitAll()
-                // The rest are secured via method-level @PreAuthorize
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

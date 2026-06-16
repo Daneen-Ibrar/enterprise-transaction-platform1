@@ -4,6 +4,8 @@ com/enterprise/api/AdminReliabilityController.class
 com/enterprise/reliability/RetryPolicyRepository.class
 com/enterprise/reliability/DlqEntryRepository.class
 com/enterprise/reliability/CircuitBreakerState.class
+com/enterprise/reconciliation/ReconciliationDetailRepository.class
+com/enterprise/reconciliation/ReconciliationScheduler.class
 com/enterprise/transaction/TransactionService.class
 com/enterprise/identity/PermissionRepository.class
 com/enterprise/security/CustomPermissionEvaluator.class
@@ -13,10 +15,12 @@ com/enterprise/audit/AuditEvent.class
 com/enterprise/api/AuditController.class
 com/enterprise/reliability/Reliable.class
 com/enterprise/api/HealthController.class
+com/enterprise/reconciliation/ReconciliationService.class
 com/enterprise/reliability/BackoffPolicy.class
 com/enterprise/reliability/CircuitBreakerPolicyRepository.class
 com/enterprise/identity/RoleRepository.class
 com/enterprise/identity/PermissionService.class
+com/enterprise/reconciliation/ReconciliationDetail.class
 com/enterprise/reliability/DlqEntry.class
 com/enterprise/reliability/RetryPolicy.class
 com/enterprise/reliability/CircuitBreakerStateRepository.class
@@ -27,6 +31,7 @@ com/enterprise/api/DashboardController.class
 com/enterprise/audit/AuditService.class
 com/enterprise/reliability/RecoveryService.class
 com/enterprise/api/PaymentController.class
+com/enterprise/api/AdminReconciliationController.class
 com/enterprise/idempotency/IdempotencyKey.class
 com/enterprise/identity/UserRepository.class
 com/enterprise/transaction/PaymentRequest.class
@@ -34,6 +39,7 @@ com/enterprise/idempotency/IdempotencyRepository.class
 com/enterprise/transaction/PaymentResponse.class
 com/enterprise/transaction/Transaction.class
 com/enterprise/config/SecurityConfig.class
+com/enterprise/reconciliation/ReconciliationRecordRepository.class
 com/enterprise/TransactionPlatformApplication.class
 com/enterprise/ledger/LedgerService.class
 com/enterprise/api/GlobalExceptionHandler.class
@@ -48,4 +54,5 @@ com/enterprise/ledger/EntryType.class
 com/enterprise/reliability/FailureClassificationRuleRepository.class
 com/enterprise/identity/Role.class
 com/enterprise/reliability/FailureClassificationRule.class
+com/enterprise/reconciliation/ReconciliationRecord.class
 com/enterprise/reliability/ReliabilityPolicyService.class
