@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>My Invoices</title></head>
+<body>
+    <h1>My Invoices</h1>
+    <table border="1">
+        <tr><th>ID</th><th>Amount</th><th>Description</th><th>Status</th><th>Action</th></tr>
+        <tr th:each="inv : ${invoices}">
+            <td th:text="${inv.id}">1</td>
+            <td th:text="${inv.amount}">100</td>
+            <td th:text="${inv.description}">desc</td>
+            <td th:text="${inv.status}">APPROVED</td>
+            <td>
+                <a th:if="${inv.status == 'APPROVED'}" th:href="@{/invoices/{id}/pay(id=${inv.id})}">Pay</a>
+                <a th:href="@{/invoices/{id}(id=${inv.id})}">View</a>
+            </td>
+        </tr>
+    </table>
+    <a href="/dashboard">Back</a>
+</body>
+</html>
