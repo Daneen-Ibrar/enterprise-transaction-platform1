@@ -15,11 +15,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))   // <-- ADD THIS
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/css/**", "/health/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/audit/**").hasAnyRole("ADMIN", "AUDITOR")
                 .requestMatchers("/invoices/create").hasRole("MERCHANT")
+                .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

@@ -1,0 +1,83 @@
+package com.enterprise.transaction;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "transaction")
+public class Transaction {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "invoice_id", nullable = false)
+    private Long invoiceId;
+
+    @Column(name = "customer_id", nullable = false)
+    private Long customerId;
+
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
+
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TransactionStatus status;
+
+    @Column(name = "idempotency_key", nullable = false, unique = true)
+    private String idempotencyKey;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    // Constructors
+    public Transaction() {}
+
+    public Transaction(Long invoiceId, Long customerId, Long merchantId,
+                       BigDecimal amount, String idempotencyKey) {
+        this.invoiceId = invoiceId;
+        this.customerId = customerId;
+        this.merchantId = merchantId;
+        this.amount = amount;
+        this.idempotencyKey = idempotencyKey;
+        this.status = TransactionStatus.PENDING;
+    }
+
+    // State transition method
+    public void transitionTo(TransactionStatus newStatus) {
+        if (!this.status.canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                "Cannot transition from " + this.status + " to " + newStatus
+            );
+        }
+        this.status = newStatus;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // Getters and setters (important for JPA)
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getInvoiceId() { return invoiceId; }
+    public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
+    public Long getCustomerId() { return customerId; }
+    public void setCustomerId(Long customerId) { this.customerId = customerId; }
+    public Long getMerchantId() { return merchantId; }
+    public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public TransactionStatus getStatus() { return status; }
+    public void setStatus(TransactionStatus status) { this.status = status; }
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+}
