@@ -1,6 +1,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/TransactionPlatformApplication.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReconciliationController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReliabilityController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminViewController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AuditController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/CorrelationIdFilter.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/DashboardController.java
