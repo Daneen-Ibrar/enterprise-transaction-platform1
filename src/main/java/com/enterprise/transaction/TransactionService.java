@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -26,7 +27,7 @@ public class TransactionService {
 
     @Transactional
     public PaymentResponse processPayment(PaymentRequest request, String idempotencyKey) {
-        // 1. Check idempotency (in real impl, we would first check the idempotency table)
+        // 1. Check idempotency
         Optional<Transaction> existing = transactionRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             Transaction tx = existing.get();
@@ -52,7 +53,6 @@ public class TransactionService {
         transaction = transactionRepository.save(transaction);
 
         // 4. Simulate settlement (transition to SETTLED)
-        // In real life, this might involve external systems. For now, we settle immediately.
         transaction.transitionTo(TransactionStatus.SETTLED);
         transaction = transactionRepository.save(transaction);
 
@@ -61,11 +61,16 @@ public class TransactionService {
         ledgerService.recordDebit(request.getCustomerId(), amount, transaction.getId());
         ledgerService.recordCredit(request.getMerchantId(), amount, transaction.getId());
 
-        // 6. Audit
+        // 6. Audit – single call with structured details
         auditService.recordEvent(
             "PAYMENT_SETTLED",
-            String.format("Transaction %d settled for amount %.2f", transaction.getId(), amount),
-            request.getCustomerId()
+            request.getCustomerId(),
+            Map.of(
+                "transactionId", transaction.getId(),
+                "amount", request.getAmount(),
+                "invoiceId", request.getInvoiceId(),
+                "merchantId", request.getMerchantId()
+            )
         );
 
         // 7. Return response

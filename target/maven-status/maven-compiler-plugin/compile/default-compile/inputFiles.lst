@@ -1,9 +1,13 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/TransactionPlatformApplication.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AuditController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/CorrelationIdFilter.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/DashboardController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/GlobalExceptionHandler.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/HealthController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PaymentController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/audit/AuditEvent.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/audit/AuditEventDTO.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/audit/AuditRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/audit/AuditService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/config/SecurityConfig.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/idempotency/IdempotencyKey.java
