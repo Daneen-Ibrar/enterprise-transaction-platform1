@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>My Invoices (Merchant)</title>
+</head>
+<body>
+    <h1>My Invoices</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="inv : ${invoices}">
+                <td th:text="${inv.id}">1</td>
+                <td th:text="${inv.customerEmail}">customer@test.com</td>
+                <td th:text="${inv.amount}">100.00</td>
+                <td th:text="${inv.description}">Test</td>
+                <td th:text="${inv.status}">APPROVED</td>
+                <td th:text="${inv.createdAt}">2026-01-01</td>
+                <td>
+                    <!-- View details -->
+                    <a th:href="@{/invoices/{id}(id=${inv.id})}">View</a>
+                    <!-- ✅ Payment link for merchant to share with customer -->
+                    <a th:href="@{/pay/{id}(id=${inv.id})}" target="_blank">🔗 Payment Link</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

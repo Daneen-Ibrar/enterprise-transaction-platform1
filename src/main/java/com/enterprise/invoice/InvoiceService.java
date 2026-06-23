@@ -1,5 +1,7 @@
 package com.enterprise.invoice;
 
+import com.enterprise.identity.AppUser;
+import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,11 +16,14 @@ public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final NotificationService notificationService;
+    private final UserRepository userRepository;   // <-- added
 
     public InvoiceService(InvoiceRepository invoiceRepository,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          UserRepository userRepository) {   // <-- added
         this.invoiceRepository = invoiceRepository;
         this.notificationService = notificationService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -42,11 +47,18 @@ public class InvoiceService {
             "/invoices/" + invoice.getId()
         );
 
-        // Notify customer (if approved immediately)
+        // If no approval required, notify the customer that the invoice is ready for payment
         if (!requiresApproval) {
-            // We'll notify customer that invoice is ready for payment
-            // but we need to map customer email to userId. This is a placeholder; we'll later resolve.
-            // For now, we'll skip or send a generic one.
+            Long customerId = getUserIdByEmail(customerEmail);
+            if (customerId != null) {
+                notificationService.createNotification(
+                    customerId,
+                    "INVOICE_READY",
+                    "Invoice Ready for Payment",
+                    String.format("Invoice #%d for %.2f from merchant %d is ready to pay", invoice.getId(), amount, merchantId),
+                    "/invoices/" + invoice.getId()
+                );
+            }
         }
         return invoice;
     }
@@ -70,6 +82,18 @@ public class InvoiceService {
             String.format("Invoice #%d approved by Admin", invoiceId),
             "/invoices/" + invoiceId
         );
+
+        // Notify customer that invoice is now approved and payable
+        Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
+        if (customerId != null) {
+            notificationService.createNotification(
+                customerId,
+                "INVOICE_APPROVED",
+                "Invoice Approved",
+                String.format("Invoice #%d has been approved and is ready for payment", invoiceId),
+                "/invoices/" + invoiceId
+            );
+        }
         return invoice;
     }
 
@@ -91,6 +115,17 @@ public class InvoiceService {
             String.format("Invoice #%d was rejected by Admin", invoiceId),
             "/invoices/" + invoiceId
         );
+        // Optionally notify customer as well
+        Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
+        if (customerId != null) {
+            notificationService.createNotification(
+                customerId,
+                "INVOICE_REJECTED",
+                "Invoice Rejected",
+                String.format("Invoice #%d was rejected", invoiceId),
+                "/invoices/" + invoiceId
+            );
+        }
         return invoice;
     }
 
@@ -113,6 +148,25 @@ public class InvoiceService {
             String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
             "/transactions/" + transactionId
         );
+
+        // Notify customer
+        Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
+        if (customerId != null) {
+            notificationService.createNotification(
+                customerId,
+                "INVOICE_PAID",
+                "Invoice Paid",
+                String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
+                "/transactions/" + transactionId
+            );
+        }
+    }
+
+    // Helper method to resolve userId from email
+    private Long getUserIdByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(AppUser::getId)
+                .orElse(null);
     }
 
     public List<Invoice> getInvoicesForMerchant(Long merchantId) {

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Two‑Factor Setup</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <h1>🔐 Two‑Factor Authentication</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <div th:if="${enabled}">
+        <p>✅ Two‑factor authentication is <strong>enabled</strong> for your account.</p>
+        <form method="post" th:action="@{/2fa/disable}">
+            <button type="submit">Disable 2FA</button>
+        </form>
+    </div>
+
+    <div th:unless="${enabled}">
+        <h3>Step 1: Scan the QR code</h3>
+        <p>Open Google Authenticator and scan this QR code:</p>
+        <img th:src="${otpAuthUrl}" alt="QR Code" style="width:200px;height:200px;"/>
+        <p>Or manually enter this secret: <code th:text="${secretKey}">XXXXX</code></p>
+
+        <h3>Step 2: Enter the 6‑digit code</h3>
+        <form method="post" th:action="@{/2fa/enable}">
+            <input type="hidden" name="secretKey" th:value="${secretKey}"/>
+            <label>Code: <input type="text" name="code" maxlength="6" required/></label>
+            <button type="submit">Enable 2FA</button>
+        </form>
+        <div th:if="${error}" style="color:red;" th:text="${error}"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var otpAuthUrl = /*[[${otpAuthUrl}]]*/ 'otpauth://totp/EnterprisePlatform:user@example.com?secret=XXXXX';
+            if (otpAuthUrl) {
+                var qrContainer = document.getElementById('qrcode');
+                new QRCode(qrContainer, {
+                    text: otpAuthUrl,
+                    width: 200,
+                    height: 200
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -7,4 +7,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findByMerchantId(Long merchantId);
     List<Invoice> findByCustomerEmail(String customerEmail);
     List<Invoice> findByStatusAndRequiresApproval(String status, boolean requiresApproval);
+    List<Invoice> findByStatus(String status);                           // new
+    List<Invoice> findByStatusAndCustomerEmailContainingIgnoreCase(String status, String email); // new
 }

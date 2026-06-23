@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Appeal – Invoice #<span th:text="${invoice.id}">1</span></title>
+</head>
+<body>
+    <h1>💬 Appeal / Chat – Invoice #<span th:text="${invoice.id}">1</span></h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <div style="border:1px solid #ccc; padding:15px; max-height:400px; overflow-y:auto; background:#f9f9f9; margin:20px 0;">
+        <div th:each="msg : ${messages}" style="margin-bottom:10px;">
+            <strong><span th:text="${msg.sender.email}">user@test.com</span></strong>
+            <span style="font-size:0.8em; color:#888;" th:text="${msg.createdAt}">2026-01-01</span>
+            <p style="margin:3px 0 0 10px;" th:text="${msg.message}">Hello</p>
+            <hr/>
+        </div>
+        <div th:if="${messages.empty}">
+            <p>No messages yet. Send your appeal below.</p>
+        </div>
+    </div>
+
+    <form method="post" th:action="@{/invoices/{id}/messages(id=${invoice.id})}">
+        <textarea name="message" rows="3" style="width:100%;" placeholder="Type your message here..." required></textarea>
+        <br/>
+        <button type="submit">Send Message</button>
+    </form>
+</body>
+</html>

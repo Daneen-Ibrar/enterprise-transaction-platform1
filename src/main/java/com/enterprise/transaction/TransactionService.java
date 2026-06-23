@@ -1,8 +1,11 @@
 package com.enterprise.transaction;
 
 import com.enterprise.audit.AuditService;
+import com.enterprise.identity.UserRepository;
 import com.enterprise.ledger.LedgerService;
-import com.enterprise.notification.NotificationService;   // <-- ADDED
+import com.enterprise.notification.EmailNotificationService;
+import com.enterprise.notification.EmailTemplates;
+import com.enterprise.notification.NotificationService;
 import com.enterprise.reliability.Reliable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,16 +20,22 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final LedgerService ledgerService;
     private final AuditService auditService;
-    private final NotificationService notificationService;   // <-- ADDED
+    private final NotificationService notificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final UserRepository userRepository;
 
     public TransactionService(TransactionRepository transactionRepository,
                               LedgerService ledgerService,
                               AuditService auditService,
-                              NotificationService notificationService) {   // <-- ADDED
+                              NotificationService notificationService,
+                              EmailNotificationService emailNotificationService,
+                              UserRepository userRepository) {
         this.transactionRepository = transactionRepository;
         this.ledgerService = ledgerService;
         this.auditService = auditService;
-        this.notificationService = notificationService;   // <-- ADDED
+        this.notificationService = notificationService;
+        this.emailNotificationService = emailNotificationService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -78,7 +87,7 @@ public class TransactionService {
             )
         );
 
-        // 7. Create notifications
+        // 7. Create in-app notifications
         notificationService.createNotification(
             request.getCustomerId(),
             "PAYMENT_SENT",
@@ -95,7 +104,24 @@ public class TransactionService {
             "/transactions/" + transaction.getId()
         );
 
-        // 8. Return response
+        // 8. Send email confirmation (async)
+        String customerEmail = userRepository.findById(request.getCustomerId())
+                .map(u -> u.getEmail())
+                .orElse(null);
+        if (customerEmail != null) {
+            emailNotificationService.sendEmailAsync(
+                customerEmail,
+                "Payment Confirmation",
+                EmailTemplates.paymentConfirmation(
+                    "Customer",
+                    request.getInvoiceId(),
+                    transaction.getId(),
+                    amount
+                )
+            );
+        }
+
+        // 9. Return response
         return new PaymentResponse(
             transaction.getId(),
             transaction.getStatus().name(),

@@ -1,6 +1,6 @@
 package com.enterprise.api;
 
-import com.enterprise.audit.AuditEventDTO;
+import com.enterprise.audit.AuditEvent;
 import com.enterprise.audit.AuditService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,10 +9,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/audit")
+@RequestMapping("/api/audit")   // <-- CHANGE HERE
 public class AuditController {
 
     private final AuditService auditService;
@@ -23,10 +22,8 @@ public class AuditController {
 
     @GetMapping("/events")
     @PreAuthorize("hasPermission(null, 'audit:view')")
-    public List<AuditEventDTO> getEvents() {
-        return auditService.getAllEvents().stream()
-            .map(AuditEventDTO::new)
-            .collect(Collectors.toList());
+    public List<AuditEvent> getEvents() {
+        return auditService.getAllEvents();
     }
 
     @GetMapping("/verify")
