@@ -1,5 +1,6 @@
 package com.enterprise.notification;
 
+import com.enterprise.api.NotificationSSEController;   // <-- ADDED
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +18,13 @@ public class NotificationService {
     @Transactional
     public Notification createNotification(Long userId, String type, String title, String message, String link) {
         Notification notification = new Notification(userId, type, title, message, link);
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+
+        // Broadcast the new count via SSE
+        long unreadCount = countUnread(userId);
+        NotificationSSEController.broadcast(userId, unreadCount);
+
+        return saved;
     }
 
     public List<Notification> getUnreadNotifications(Long userId) {
@@ -40,3 +47,4 @@ public class NotificationService {
         notificationRepository.markAllAsRead(userId);
     }
 }
+

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <title>Invoice Details</title>
+</head>
+<body>
+    <h1>Invoice #<span th:text="${invoice.id}">1</span></h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <table>
+        <tr><th>Amount</th><td th:text="${invoice.amount}">100.00</td></tr>
+        <tr><th>Description</th><td th:text="${invoice.description}">Test</td></tr>
+        <tr><th>Customer</th><td th:text="${invoice.customerEmail}">customer@test.com</td></tr>
+        <tr><th>Merchant</th><td th:text="${invoice.merchantId}">2</td></tr>
+        <tr><th>Status</th><td th:text="${invoice.status}">APPROVED</td></tr>
+        <tr><th>Created</th><td th:text="${invoice.createdAt}">2026-01-01</td></tr>
+        <tr th:if="${invoice.updatedAt}"><th>Updated</th><td th:text="${invoice.updatedAt}">2026-01-02</td></tr>
+    </table>
+
+    <!-- ✅ Customer only: if approved and not paid, show Pay Now button -->
+    <div th:if="${invoice.status == 'APPROVED'}" sec:authorize="hasRole('CUSTOMER')">
+        <a th:href="@{/pay/{id}(id=${invoice.id})}" class="btn">Pay Now</a>
+    </div>
+
+    <!-- Merchant: show Payment Link to share with customer -->
+    <div th:if="${invoice.status == 'APPROVED'}" sec:authorize="hasRole('MERCHANT')">
+        <p>📋 Share this payment link with your customer:</p>
+        <a th:href="@{/pay/{id}(id=${invoice.id})}" target="_blank">🔗 Payment Link</a>
+    </div>
+
+    <!-- If pending approval, show message (visible to all) -->
+    <div th:if="${invoice.status == 'PENDING_APPROVAL'}">
+        <p>⏳ This invoice is pending admin approval.</p>
+    </div>
+
+    <!-- If rejected, show Appeal button for merchant -->
+    <div th:if="${invoice.status == 'REJECTED'}" sec:authorize="hasRole('MERCHANT')">
+        <a th:href="@{/invoices/{id}/messages(id=${invoice.id})}" class="btn">📩 Appeal</a>
+        <p>Your invoice was rejected. Click "Appeal" to discuss with the admin.</p>
+    </div>
+
+    <!-- If already paid, show status (visible to all) -->
+    <div th:if="${invoice.status == 'PAID'}">
+        <p>✅ This invoice has been paid.</p>
+    </div>
+
+    <a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>

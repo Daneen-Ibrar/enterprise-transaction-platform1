@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Refund Transaction</title>
+</head>
+<body>
+    <h1>Refund Transaction #<span th:text="${transaction.id}">1</span></h1>
+    <a href="/admin/refunds">← Back to list</a>
+
+    <form method="post" th:action="@{/admin/refunds/{id}(id=${transaction.id})}">
+        <p>Amount: <span th:text="${transaction.amount}">100.00</span></p>
+        <p>Customer: <span th:text="${transaction.customerId}">1</span></p>
+        <p>Merchant: <span th:text="${transaction.merchantId}">2</span></p>
+        <label>Reason: <input type="text" name="reason" required/></label><br/>
+        <button type="submit">Issue Refund</button>
+    </form>
+</body>
+</html>

@@ -49,3 +49,8 @@ services:
       TEST_ADMIN_PASSWORD: password123
       TEST_AUDITOR_EMAIL: auditor@test.com
       TEST_AUDITOR_PASSWORD: password123
+      # Email credentials:
+      MAIL_USERNAME: daneen.ibrar@gmail.com
+      MAIL_PASSWORD: rrakleuwvhmtanfz
+      # Also set app.email.mode if you want:
+      APP_EMAIL_MODE: stub

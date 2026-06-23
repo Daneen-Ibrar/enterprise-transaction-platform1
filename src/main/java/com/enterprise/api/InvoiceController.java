@@ -1,9 +1,13 @@
 package com.enterprise.api;
 
 import com.enterprise.invoice.Invoice;
+import com.enterprise.invoice.InvoiceMessage;
+import com.enterprise.invoice.InvoiceMessageService;
 import com.enterprise.invoice.InvoiceService;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -16,15 +20,20 @@ import java.util.List;
 @RequestMapping("/invoices")
 public class InvoiceController {
 
+    private static final Logger log = LoggerFactory.getLogger(InvoiceController.class);
+
     private final InvoiceService invoiceService;
     private final UserRepository userRepository;
+    private final InvoiceMessageService messageService;
 
-    public InvoiceController(InvoiceService invoiceService, UserRepository userRepository) {
+    public InvoiceController(InvoiceService invoiceService,
+                             UserRepository userRepository,
+                             InvoiceMessageService messageService) {
         this.invoiceService = invoiceService;
         this.userRepository = userRepository;
+        this.messageService = messageService;
     }
 
-    // Merchant: create invoice form
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("invoice", new Invoice());
@@ -40,14 +49,11 @@ public class InvoiceController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Long merchantId = merchant.getId();
 
-        // Determine if approval needed (e.g., amount > 5000)
         boolean requiresApproval = amount.compareTo(BigDecimal.valueOf(5000)) > 0;
-
         invoiceService.createInvoice(amount, description, customerEmail, merchantId, requiresApproval);
         return "redirect:/dashboard";
     }
 
-    // Customer view: list their invoices
     @GetMapping("/customer")
     public String customerInvoices(Authentication authentication, Model model) {
         String email = authentication.getName();
@@ -56,7 +62,6 @@ public class InvoiceController {
         return "invoice/customer-list";
     }
 
-    // Merchant view: list their invoices
     @GetMapping("/merchant")
     public String merchantInvoices(Authentication authentication, Model model) {
         AppUser merchant = userRepository.findByEmail(authentication.getName())
@@ -66,24 +71,66 @@ public class InvoiceController {
         return "invoice/merchant-list";
     }
 
-    // View invoice detail
     @GetMapping("/{id}")
     public String viewInvoice(@PathVariable Long id, Model model) {
-        Invoice invoice = invoiceService.findById(id)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
-        model.addAttribute("invoice", invoice);
-        return "invoice/detail";
+        try {
+            Invoice invoice = invoiceService.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Invoice not found"));
+            model.addAttribute("invoice", invoice);
+            return "invoice/detail";
+        } catch (Exception e) {
+            log.error("Error loading invoice detail for id {}: {}", id, e.getMessage(), e);
+            model.addAttribute("error", "Could not load invoice details.");
+            return "error";
+        }
     }
 
-    // Customer: pay invoice (GET form, POST will be handled by PaymentController)
+    // Redirect old pay form to public gateway
     @GetMapping("/{id}/pay")
-    public String showPayForm(@PathVariable Long id, Model model) {
+    public String redirectPay(@PathVariable Long id) {
+        return "redirect:/pay/" + id;
+    }
+
+    // === Chat endpoints ===
+
+    @GetMapping("/{id}/messages")
+    public String viewChat(@PathVariable Long id, Model model, Authentication authentication) {
         Invoice invoice = invoiceService.findById(id)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
-        if (!"APPROVED".equals(invoice.getStatus())) {
-            throw new IllegalStateException("Invoice is not approved for payment");
+        AppUser user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isMerchant = user.getId().equals(invoice.getMerchantId());
+        boolean isCustomer = invoice.getCustomerEmail().equals(user.getEmail());
+        boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"));
+        if (!(isMerchant || isCustomer || isAdmin)) {
+            throw new RuntimeException("Unauthorized");
         }
+
+        List<InvoiceMessage> messages = messageService.getMessagesForInvoice(id);
         model.addAttribute("invoice", invoice);
-        return "invoice/pay";
+        model.addAttribute("messages", messages);
+        model.addAttribute("userId", user.getId());
+        return "invoice/chat";
+    }
+
+    @PostMapping("/{id}/messages")
+    public String sendMessage(@PathVariable Long id,
+                              @RequestParam String message,
+                              Authentication authentication) {
+        Invoice invoice = invoiceService.findById(id)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        AppUser user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isMerchant = user.getId().equals(invoice.getMerchantId());
+        boolean isCustomer = invoice.getCustomerEmail().equals(user.getEmail());
+        boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"));
+        if (!(isMerchant || isCustomer || isAdmin)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        messageService.sendMessage(invoice, user, message);
+        return "redirect:/invoices/" + id + "/messages";
     }
 }
