@@ -37,6 +37,7 @@ public class InvoiceController {
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("invoice", new Invoice());
+        model.addAttribute("currencies", List.of("GBP", "USD", "EUR"));
         return "invoice/create";
     }
 
@@ -44,13 +45,16 @@ public class InvoiceController {
     public String createInvoice(@RequestParam BigDecimal amount,
                                 @RequestParam String description,
                                 @RequestParam String customerEmail,
+                                @RequestParam(defaultValue = "GBP") String currency,
                                 Authentication authentication) {
         AppUser merchant = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Long merchantId = merchant.getId();
 
+        // Determine if approval is needed (e.g., amount > 5000)
         boolean requiresApproval = amount.compareTo(BigDecimal.valueOf(5000)) > 0;
-        invoiceService.createInvoice(amount, description, customerEmail, merchantId, requiresApproval);
+
+        invoiceService.createInvoice(amount, description, customerEmail, merchantId, requiresApproval, currency);
         return "redirect:/dashboard";
     }
 
@@ -85,14 +89,12 @@ public class InvoiceController {
         }
     }
 
-    // Redirect old pay form to public gateway
     @GetMapping("/{id}/pay")
     public String redirectPay(@PathVariable Long id) {
         return "redirect:/pay/" + id;
     }
 
     // === Chat endpoints ===
-
     @GetMapping("/{id}/messages")
     public String viewChat(@PathVariable Long id, Model model, Authentication authentication) {
         Invoice invoice = invoiceService.findById(id)

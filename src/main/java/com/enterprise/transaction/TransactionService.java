@@ -52,47 +52,50 @@ public class TransactionService {
             );
         }
 
-        // 2. Create new transaction (PENDING)
+        // 2. Create transaction with currency
+        String currency = request.getCurrency() != null ? request.getCurrency() : "GBP";
         Transaction transaction = new Transaction(
             request.getInvoiceId(),
             request.getCustomerId(),
             request.getMerchantId(),
             request.getAmount(),
-            idempotencyKey
+            idempotencyKey,
+            currency
         );
         transaction = transactionRepository.save(transaction);
 
-        // 3. Authorise (transition to AUTHORISED)
+        // 3. Authorise
         transaction.transitionTo(TransactionStatus.AUTHORISED);
         transaction = transactionRepository.save(transaction);
 
-        // 4. Simulate settlement (transition to SETTLED)
+        // 4. Settle
         transaction.transitionTo(TransactionStatus.SETTLED);
         transaction = transactionRepository.save(transaction);
 
-        // 5. Create ledger entries
+        // 5. Ledger entries (amount stays in transaction currency, but ledger stores the numeric amount)
         BigDecimal amount = request.getAmount();
         ledgerService.recordDebit(request.getCustomerId(), amount, transaction.getId());
         ledgerService.recordCredit(request.getMerchantId(), amount, transaction.getId());
 
-        // 6. Audit – single call with structured details
+        // 6. Audit
         auditService.recordEvent(
             "PAYMENT_SETTLED",
             request.getCustomerId(),
             Map.of(
                 "transactionId", transaction.getId(),
                 "amount", request.getAmount(),
+                "currency", currency,
                 "invoiceId", request.getInvoiceId(),
                 "merchantId", request.getMerchantId()
             )
         );
 
-        // 7. Create in-app notifications
+        // 7. In-app notifications
         notificationService.createNotification(
             request.getCustomerId(),
             "PAYMENT_SENT",
             "Payment Sent",
-            String.format("You paid %.2f to merchant %d (Invoice %d)", amount, request.getMerchantId(), request.getInvoiceId()),
+            String.format("You paid %.2f %s to merchant %d (Invoice %d)", amount, currency, request.getMerchantId(), request.getInvoiceId()),
             "/transactions/" + transaction.getId()
         );
 
@@ -100,11 +103,11 @@ public class TransactionService {
             request.getMerchantId(),
             "PAYMENT_RECEIVED",
             "Payment Received",
-            String.format("Customer %d paid %.2f (Invoice %d)", request.getCustomerId(), amount, request.getInvoiceId()),
+            String.format("Customer %d paid %.2f %s (Invoice %d)", request.getCustomerId(), amount, currency, request.getInvoiceId()),
             "/transactions/" + transaction.getId()
         );
 
-        // 8. Send email confirmation (async)
+        // 8. Email
         String customerEmail = userRepository.findById(request.getCustomerId())
                 .map(u -> u.getEmail())
                 .orElse(null);
@@ -116,7 +119,8 @@ public class TransactionService {
                     "Customer",
                     request.getInvoiceId(),
                     transaction.getId(),
-                    amount
+                    amount,
+                    currency
                 )
             );
         }

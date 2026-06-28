@@ -1,3 +1,4 @@
+com/enterprise/currency/ExchangeRateService.class
 com/enterprise/audit/AuditEventDTO.class
 com/enterprise/api/AdminReliabilityController.class
 com/enterprise/reliability/RetryPolicyRepository.class
@@ -22,9 +23,13 @@ com/enterprise/reliability/CircuitBreakerPolicy.class
 com/enterprise/api/ExportController.class
 com/enterprise/api/DashboardController.class
 com/enterprise/audit/AuditService.class
+com/enterprise/apikey/ApiKeyService.class
 com/enterprise/reliability/RecoveryService.class
 com/enterprise/api/PaymentController.class
+com/enterprise/apikey/ApiKeyRepository.class
+com/enterprise/api/PublicApiController.class
 com/enterprise/identity/UserRepository.class
+com/enterprise/apikey/ApiKey.class
 com/enterprise/idempotency/IdempotencyRepository.class
 com/enterprise/invoice/Invoice.class
 com/enterprise/transaction/PaymentResponse.class
@@ -63,6 +68,7 @@ com/enterprise/api/AdminRefundController.class
 com/enterprise/reliability/CircuitBreakerPolicyRepository.class
 com/enterprise/identity/RoleRepository.class
 com/enterprise/notification/Notification.class
+com/enterprise/security/RateLimitingFilter$RateLimitInfo.class
 com/enterprise/identity/PermissionService.class
 com/enterprise/reconciliation/ReconciliationDetail.class
 com/enterprise/invoice/InvoiceRepository.class
@@ -71,6 +77,8 @@ com/enterprise/invoice/InvoiceMessageService.class
 com/enterprise/api/TransactionViewController.class
 com/enterprise/api/CorrelationIdFilter.class
 com/enterprise/identity/TestUserInitializer.class
+com/enterprise/api/AdminApiKeyController.class
+com/enterprise/apikey/ApiKeyResponse.class
 com/enterprise/api/TestEmailController.class
 com/enterprise/api/PublicPaymentController.class
 com/enterprise/api/AdminReconciliationController.class
@@ -80,12 +88,14 @@ com/enterprise/transaction/PaymentRequest.class
 com/enterprise/api/AdminEmailController.class
 com/enterprise/transaction/Transaction.class
 com/enterprise/api/NotificationController.class
+com/enterprise/security/RateLimitingFilter.class
 com/enterprise/config/SecurityConfig.class
 com/enterprise/reconciliation/ReconciliationRecordRepository.class
 com/enterprise/notification/EmailTemplates.class
 com/enterprise/TransactionPlatformApplication.class
 com/enterprise/ledger/LedgerService.class
 com/enterprise/api/GlobalExceptionHandler.class
+com/enterprise/security/ApiKeyAuthenticationFilter.class
 com/enterprise/audit/AuditRepository.class
 com/enterprise/api/HomeController.class
 com/enterprise/api/AdminViewController.class

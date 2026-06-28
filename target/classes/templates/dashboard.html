@@ -113,6 +113,10 @@
         <li sec:authorize="hasAnyRole('ADMIN', 'AUDITOR')">
             <a href="/export/transactions/csv">📥 Export Transactions (CSV)</a>
         </li>
+        <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/api-keys">🔑 API Keys</a>
+</li>
+
 
         <li>
     <a href="/2fa/setup">🔐 Two‑Factor Setup</a>
