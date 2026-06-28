@@ -15,6 +15,7 @@
                 <th>Customer</th>
                 <th>Merchant</th>
                 <th>Amount</th>
+                <th>Currency</th>   <!-- added -->
                 <th>Status</th>
                 <th>Created</th>
             </tr>
@@ -26,6 +27,7 @@
                 <td th:text="${tx.customerId}">1</td>
                 <td th:text="${tx.merchantId}">2</td>
                 <td th:text="${tx.amount}">100.00</td>
+                <td th:text="${tx.currency}">GBP</td>   <!-- added -->
                 <td th:text="${tx.status}">SETTLED</td>
                 <td th:text="${tx.createdAt}">2026-01-01</td>
             </tr>

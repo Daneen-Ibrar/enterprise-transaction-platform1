@@ -24,6 +24,9 @@ public class Transaction {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
+    @Column(length = 3)
+    private String currency = "GBP";
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TransactionStatus status;
@@ -42,15 +45,20 @@ public class Transaction {
 
     public Transaction(Long invoiceId, Long customerId, Long merchantId,
                        BigDecimal amount, String idempotencyKey) {
+        this(invoiceId, customerId, merchantId, amount, idempotencyKey, "GBP");
+    }
+
+    public Transaction(Long invoiceId, Long customerId, Long merchantId,
+                       BigDecimal amount, String idempotencyKey, String currency) {
         this.invoiceId = invoiceId;
         this.customerId = customerId;
         this.merchantId = merchantId;
         this.amount = amount;
         this.idempotencyKey = idempotencyKey;
+        this.currency = (currency != null && !currency.isEmpty()) ? currency : "GBP";
         this.status = TransactionStatus.PENDING;
     }
 
-    // State transition method
     public void transitionTo(TransactionStatus newStatus) {
         if (!this.status.canTransitionTo(newStatus)) {
             throw new IllegalStateException(
@@ -61,23 +69,34 @@ public class Transaction {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters and setters (important for JPA)
+    // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
     public Long getInvoiceId() { return invoiceId; }
     public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
+
     public Long getCustomerId() { return customerId; }
     public void setCustomerId(Long customerId) { this.customerId = customerId; }
+
     public Long getMerchantId() { return merchantId; }
     public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
+
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+
     public TransactionStatus getStatus() { return status; }
     public void setStatus(TransactionStatus status) { this.status = status; }
+
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

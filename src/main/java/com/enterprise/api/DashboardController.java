@@ -59,7 +59,7 @@ public class DashboardController {
 
         // Notifications for this user
         long unreadCount = notificationService.countUnread(userId);
-        var recentNotifications = notificationService.getRecentNotifications(userId, 5);
+       var recentNotifications = notificationService.getRecentUnreadNotifications(userId, 5);
 
         model.addAttribute("unreadCount", unreadCount);
         model.addAttribute("notifications", recentNotifications);

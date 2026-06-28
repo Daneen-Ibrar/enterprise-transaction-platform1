@@ -1,7 +1,9 @@
 package com.enterprise.config;
 
+import com.enterprise.security.ApiKeyAuthenticationFilter;
 import com.enterprise.security.CustomAuthenticationSuccessHandler;
 import com.enterprise.security.CustomPermissionEvaluator;
+import com.enterprise.security.RateLimitingFilter;
 import com.enterprise.security.TwoFactorAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,33 +24,42 @@ public class SecurityConfig {
 
     private final CustomPermissionEvaluator customPermissionEvaluator;
     private final CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+    private final RateLimitingFilter rateLimitingFilter;
 
     public SecurityConfig(CustomPermissionEvaluator customPermissionEvaluator,
-                          CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler) {
+                          CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler,
+                          ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+                          RateLimitingFilter rateLimitingFilter) {
         this.customPermissionEvaluator = customPermissionEvaluator;
         this.customAuthenticationSuccessHandler = customAuthenticationSuccessHandler;
+        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
+        this.rateLimitingFilter = rateLimitingFilter;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/admin/**", "/login", "/invoices/**", "/pay/**", "/2fa/verify"))
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/admin/**", "/login", "/invoices/**", "/pay/**", "/api/public/**"))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/login", "/css/**", "/health/**", "/pay/**", "/test/email",
-                                 "/2fa/verify", "/2fa/setup", "/2fa/enable", "/2fa/disable").permitAll()
+                                 "/2fa/**", "/api/public/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
                 .loginPage("/login")
-                .successHandler(customAuthenticationSuccessHandler)   // <-- custom handler
+                .successHandler(customAuthenticationSuccessHandler)
                 .permitAll()
             )
             .logout(logout -> logout
                 .logoutSuccessUrl("/login?logout")
                 .permitAll()
             )
-            // Add 2FA filter after the username/password filter
-            .addFilterAfter(new TwoFactorAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+            // Add 2FA filter
+            .addFilterAfter(new TwoFactorAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+            // Add API Key authentication and rate limiting filters
+            .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(rateLimitingFilter, ApiKeyAuthenticationFilter.class);
 
         return http.build();
     }

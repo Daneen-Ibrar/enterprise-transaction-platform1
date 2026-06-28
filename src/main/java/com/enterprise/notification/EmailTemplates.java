@@ -4,18 +4,24 @@ import java.math.BigDecimal;
 
 public class EmailTemplates {
 
-    public static String paymentConfirmation(String customerName, Long invoiceId, Long transactionId, BigDecimal amount) {
+    public static String paymentConfirmation(String customerName, Long invoiceId, Long transactionId, BigDecimal amount, String currency) {
+        String symbol = switch (currency) {
+            case "USD" -> "$";
+            case "EUR" -> "€";
+            default -> "£";
+        };
         return String.format("""
             Dear Customer,
 
-            Your payment of £%.2f for Invoice #%d has been confirmed.
+            Your payment of %s%.2f for Invoice #%d has been confirmed.
             Transaction ID: %d
+            Currency: %s
 
             Thank you for your business.
 
             Regards,
             Enterprise Transaction Platform
-            """, amount, invoiceId, transactionId);
+            """, symbol, amount, invoiceId, transactionId, currency);
     }
 
     public static String invoiceApproved(Long invoiceId, BigDecimal amount, String merchantName) {

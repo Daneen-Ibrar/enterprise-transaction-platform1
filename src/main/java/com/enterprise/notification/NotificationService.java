@@ -1,6 +1,6 @@
 package com.enterprise.notification;
 
-import com.enterprise.api.NotificationSSEController;   // <-- ADDED
+import com.enterprise.api.NotificationSSEController;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,10 +31,20 @@ public class NotificationService {
         return notificationRepository.findByUserIdAndReadFalseOrderByCreatedAtDesc(userId);
     }
 
+    // New method: returns only unread, limited by count
+    public List<Notification> getRecentUnreadNotifications(Long userId, int limit) {
+        return notificationRepository.findByUserIdAndReadFalseOrderByCreatedAtDesc(userId)
+                .stream()
+                .limit(limit)
+                .toList();
+    }
+
     public long countUnread(Long userId) {
         return notificationRepository.countByUserIdAndReadFalse(userId);
     }
 
+    // Kept for backward compatibility, but you can remove if not used elsewhere
+    @Deprecated
     public List<Notification> getRecentNotifications(Long userId, int limit) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
@@ -47,4 +57,3 @@ public class NotificationService {
         notificationRepository.markAllAsRead(userId);
     }
 }
-

@@ -1,12 +1,21 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head><title>Create Invoice</title></head>
+<head>
+    <title>Create Invoice</title>
+</head>
 <body>
     <h1>Create Invoice</h1>
     <form method="post" th:action="@{/invoices/create}">
         <label>Amount: <input type="number" step="0.01" name="amount" required/></label><br/>
         <label>Description: <input type="text" name="description" required/></label><br/>
         <label>Customer Email: <input type="email" name="customerEmail" required/></label><br/>
+        <label>Currency:
+            <select name="currency">
+                <option value="GBP">£ GBP</option>
+                <option value="USD">$ USD</option>
+                <option value="EUR">€ EUR</option>
+            </select>
+        </label><br/>
         <button type="submit">Create Invoice</button>
     </form>
     <a href="/dashboard">Back to Dashboard</a>
