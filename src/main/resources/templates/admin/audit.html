@@ -14,9 +14,8 @@
                 <th>Event Type</th>
                 <th>User</th>
                 <th>Details</th>
-                <th>Previous Hash</th>
-                <th>Current Hash</th>
                 <th>Created</th>
+                <th>Diff</th>
             </tr>
         </thead>
         <tbody>
@@ -25,9 +24,12 @@
                 <td th:text="${event.eventType}">PAYMENT_SETTLED</td>
                 <td th:text="${event.userId}">1</td>
                 <td th:text="${event.details}">{...}</td>
-                <td th:text="${event.previousHash}">abc123</td>
-                <td th:text="${event.currentHash}">def456</td>
                 <td th:text="${event.createdAt}">2026-01-01</td>
+                <td>
+                    <a th:if="${event.previousState != null && event.currentState != null}"
+                       th:href="@{/admin/audit/diff/{id}(id=${event.id})}">🔍 Diff</a>
+                    <span th:unless="${event.previousState != null && event.currentState != null}">—</span>
+                </td>
             </tr>
         </tbody>
     </table>

@@ -1,5 +1,6 @@
 package com.enterprise.identity;
 
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,7 +20,12 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         AppUser appUser = userRepository.findByEmail(email)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+
+        // ----- Check if account is active -----
+        if (!appUser.isActive()) {
+            throw new DisabledException("Your account has been disabled by an administrator.");
+        }
 
         return User.builder()
             .username(appUser.getEmail())

@@ -1,85 +1,155 @@
 package com.enterprise.refund;
 
 import com.enterprise.audit.AuditService;
+import com.enterprise.events.RefundProcessedEvent;
+import com.enterprise.feature.FeatureFlagService;
 import com.enterprise.ledger.LedgerService;
 import com.enterprise.notification.NotificationService;
 import com.enterprise.transaction.Transaction;
 import com.enterprise.transaction.TransactionRepository;
 import com.enterprise.transaction.TransactionStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 @Service
 public class RefundService {
 
+    private static final Logger log = LoggerFactory.getLogger(RefundService.class);
+
+    private final RefundRuleRepository ruleRepository;
     private final TransactionRepository transactionRepository;
     private final LedgerService ledgerService;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final FeatureFlagService featureFlagService;
+    private final ExpressionParser parser = new SpelExpressionParser();
 
-    public RefundService(TransactionRepository transactionRepository,
+    public RefundService(RefundRuleRepository ruleRepository,
+                         TransactionRepository transactionRepository,
                          LedgerService ledgerService,
                          AuditService auditService,
-                         NotificationService notificationService) {
+                         NotificationService notificationService,
+                         ApplicationEventPublisher eventPublisher,
+                         FeatureFlagService featureFlagService) {
+        this.ruleRepository = ruleRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerService = ledgerService;
         this.auditService = auditService;
         this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
+        this.featureFlagService = featureFlagService;
+    }
+
+    public RefundEligibility evaluate(Transaction transaction) {
+        log.info("Evaluating refund eligibility for transaction {}", transaction.getId());
+        List<RefundRule> rules = ruleRepository.findByActiveTrueOrderByRulePriorityAsc();
+        log.info("Found {} active refund rules", rules.size());
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        context.setVariable("amount", transaction.getAmount());
+        context.setVariable("customerId", transaction.getCustomerId());
+        context.setVariable("merchantId", transaction.getMerchantId());
+
+        for (RefundRule rule : rules) {
+            try {
+                Boolean matches = parser.parseExpression(rule.getConditionExpression())
+                        .getValue(context, Boolean.class);
+                if (Boolean.TRUE.equals(matches)) {
+                    log.info("Rule matched: action={}", rule.getAction());
+                    return new RefundEligibility(rule.getAction(), rule.getRequiredPermission());
+                }
+            } catch (Exception e) {
+                log.warn("Rule evaluation failed for expression: {}", rule.getConditionExpression(), e);
+            }
+        }
+        log.warn("No matching rule, defaulting to DENY");
+        return new RefundEligibility("DENY", null);
     }
 
     @Transactional
-    public void processRefund(Long transactionId, String reason, Long adminId) {
-        // 1. Fetch and validate
-        Transaction tx = transactionRepository.findById(transactionId)
+    public Transaction processRefund(Long originalTransactionId, Long adminId, String reason) {
+        // ----- FEATURE FLAG CHECK -----
+        if (!featureFlagService.isEnabled("REFUNDS")) {
+            throw new RuntimeException("Refund feature is currently disabled.");
+        }
+
+        log.info("Processing refund for transaction {} by admin {}", originalTransactionId, adminId);
+        Transaction original = transactionRepository.findById(originalTransactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found"));
-        if (tx.getStatus() != TransactionStatus.SETTLED) {
+        if (original.getStatus() != TransactionStatus.SETTLED) {
             throw new IllegalStateException("Only settled transactions can be refunded");
         }
 
-        // 2. Transition to REFUNDED
-        tx.transitionTo(TransactionStatus.REFUNDED);
-        transactionRepository.save(tx);
+        RefundEligibility eligibility = evaluate(original);
+        if ("DENY".equals(eligibility.getAction())) {
+            throw new RuntimeException("Refund not allowed by policy");
+        }
 
-        // 3. Reverse ledger entries
-        // Assuming we have a method in LedgerService to reverse a transaction.
-        // For now, we'll call a simple reversal method (we need to implement this).
-        // We'll just create compensation entries (debit/credit reversed).
-        BigDecimal amount = tx.getAmount();
-        // Reversal: customer gets credited back, merchant gets debited.
-        // In a real system, you'd use a dedicated ledger reversal method.
-        // We'll simulate by calling a new method: ledgerService.reverseTransaction(tx.getId(), amount);
-        // For now, we'll manually record compensation entries.
-        // I'll show a placeholder – you can implement it properly.
+        Transaction refund = new Transaction(
+                original.getInvoiceId(),
+                original.getMerchantId(),
+                original.getCustomerId(),
+                original.getAmount().negate(),
+                "refund-" + System.currentTimeMillis()
+        );
+        refund.setStatus(TransactionStatus.REFUNDED);
+        refund = transactionRepository.save(refund);
+        log.info("Refund transaction created with id {}", refund.getId());
 
-        // 4. Audit
+        ledgerService.recordCredit(original.getCustomerId(), original.getAmount(), refund.getId());
+        ledgerService.recordDebit(original.getMerchantId(), original.getAmount(), refund.getId());
+
+        original.setStatus(TransactionStatus.REFUNDED);
+        transactionRepository.save(original);
+
+        // Audit with snapshots – before: original (before refund), after: refund
         auditService.recordEvent(
-            "REFUND_ISSUED",
+            "REFUND_PROCESSED",
             adminId,
             Map.of(
-                "transactionId", tx.getId(),
-                "amount", amount,
+                "originalTransactionId", originalTransactionId,
+                "refundTransactionId", refund.getId(),
+                "amount", original.getAmount(),
                 "reason", reason
-            )
+            ),
+            "Transaction",
+            refund.getId(),
+            original,   // previous state – original transaction (still SETTLED before we changed it)
+            refund      // current state – the refund transaction
         );
 
-        // 5. Notify customer and merchant
-        notificationService.createNotification(
-            tx.getCustomerId(),
-            "REFUND_ISSUED",
-            "Refund Issued",
-            String.format("Your transaction #%d has been refunded (%.2f) - Reason: %s", tx.getId(), amount, reason),
-            "/transactions/" + tx.getId()
-        );
+        notificationService.createNotification(original.getCustomerId(),
+                "REFUND_RECEIVED", "Refund Processed",
+                "Refund of " + original.getAmount() + " for transaction " + originalTransactionId,
+                "/transactions/" + refund.getId());
+        notificationService.createNotification(original.getMerchantId(),
+                "REFUND_ISSUED", "Refund Issued",
+                "Refund of " + original.getAmount() + " to customer",
+                "/transactions/" + refund.getId());
 
-        notificationService.createNotification(
-            tx.getMerchantId(),
-            "REFUND_ISSUED",
-            "Refund Issued",
-            String.format("Transaction #%d has been refunded (%.2f) - Reason: %s", tx.getId(), amount, reason),
-            "/transactions/" + tx.getId()
-        );
+        eventPublisher.publishEvent(new RefundProcessedEvent(refund, original));
+        log.info("Refund completed for transaction {}", originalTransactionId);
+
+        return refund;
+    }
+
+    public static class RefundEligibility {
+        private final String action;
+        private final String requiredPermission;
+        public RefundEligibility(String action, String requiredPermission) {
+            this.action = action;
+            this.requiredPermission = requiredPermission;
+        }
+        public String getAction() { return action; }
+        public String getRequiredPermission() { return requiredPermission; }
     }
 }

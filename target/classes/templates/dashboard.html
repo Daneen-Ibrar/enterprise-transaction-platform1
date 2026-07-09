@@ -14,6 +14,9 @@
         .notification-item { padding: 5px 0; border-bottom: 1px solid #eee; }
         .notification-item .title { font-weight: bold; }
         .notification-item .time { font-size: 0.8em; color: #888; }
+        .widget { border: 1px solid #ddd; padding: 15px; margin: 10px; border-radius: 8px; display: inline-block; min-width: 200px; }
+        .widget-warning { border-color: #ff9800; background-color: #fff3e0; }
+        .widget-danger { border-color: #f44336; background-color: #ffebee; }
     </style>
 </head>
 <body>
@@ -61,28 +64,48 @@
 
     <hr/>
 
+    <!-- ========== SUSPICIOUS INVOICES WIDGET (FIXED) ========== -->
+    <div sec:authorize="hasRole('ADMIN')">
+        <div class="widget" th:classappend="${suspiciousCount > 0 ? 'widget-warning' : ''}">
+            <h3>🚨 Suspicious Invoices</h3>
+            <p style="font-size: 2em; font-weight: bold;" th:text="${suspiciousCount}">0</p>
+            <p th:if="${suspiciousCount > 0}" style="color: red; font-weight: bold;">⚠️ Action Required!</p>
+            <a href="/admin/invoices/suspicious">View Suspicious →</a>
+        </div>
+    </div>
+    <!-- ======================================================== -->
+
+    <hr/>
+
     <h2>Quick Actions</h2>
     <ul>
         <li sec:authorize="hasRole('MERCHANT')">
             <a href="#" onclick="alert('Payment link: ' + window.location.origin + '/pay/1')">🔗 Share Payment Link</a>
         </li>
-        <!-- Merchant Actions -->
         <li sec:authorize="hasRole('MERCHANT')">
             <a href="/invoices/create">📄 Create Invoice</a>
         </li>
         <li sec:authorize="hasRole('MERCHANT')">
             <a href="/invoices/merchant">📋 My Invoices</a>
         </li>
-
-        <!-- Customer Actions -->
         <li sec:authorize="hasRole('CUSTOMER')">
             <a href="/invoices/customer">💳 My Invoices</a>
         </li>
-
-        <!-- Admin Actions -->
+  <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/approval-rules">⚙️ Approval Rules</a>
+</li>
+<li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/refund-rules">⚙️ Refund Rules</a>
+</li>
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/invoices/pending">⏳ Pending Approvals</a>
         </li>
+        <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/webhooks">🌐 Webhooks</a>
+</li>
+<li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/features">⚙️ Feature Toggles</a>
+</li>
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/transactions">📊 View All Transactions</a>
         </li>
@@ -102,25 +125,26 @@
             <a href="/admin/invoices/rejected">🚫 Rejected Invoices</a>
         </li>
         <li sec:authorize="hasRole('ADMIN')">
-            <a href="/admin/emails">📧 Email Logs</a>
-        </li>
-        <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/reports">📊 Reports Dashboard</a>
         </li>
         <li sec:authorize="hasAnyRole('ADMIN', 'AUDITOR')">
             <a href="/audit/events">🔍 Audit Events & Verification</a>
         </li>
+      <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/users/restore">🔓 Restore User Access</a>
+</li>
+<li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/users">👥 User Management</a>
+</li>
         <li sec:authorize="hasAnyRole('ADMIN', 'AUDITOR')">
             <a href="/export/transactions/csv">📥 Export Transactions (CSV)</a>
         </li>
         <li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/api-keys">🔑 API Keys</a>
-</li>
-
-
+            <a href="/admin/api-keys">🔑 API Keys</a>
+        </li>
         <li>
-    <a href="/2fa/setup">🔐 Two‑Factor Setup</a>
-</li>
+            <a href="/2fa/setup">🔐 Two‑Factor Setup</a>
+        </li>
     </ul>
 
     <hr/>
@@ -129,7 +153,7 @@
         <button type="submit">Logout</button>
     </form>
 
-    <!-- SSE for real‑time notification updates (replaces HTMX polling) -->
+    <!-- SSE for real‑time notification updates -->
     <script>
         (function() {
             if (typeof EventSource !== 'undefined') {
@@ -145,11 +169,9 @@
                             badge.style.display = 'none';
                         }
                     }
-                    // Optionally refresh the notification dropdown list, but we'll keep it simple.
                 });
                 source.onerror = function(error) {
                     console.error('SSE error:', error);
-                    // The browser will automatically attempt to reconnect.
                 };
             } else {
                 console.warn('EventSource not supported – please use a modern browser.');
@@ -162,7 +184,6 @@
             var dropdown = document.getElementById('notificationDropdown');
             dropdown.classList.toggle('show');
         }
-        // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
             var bell = document.querySelector('.notification-bell');
             if (!bell.contains(event.target)) {

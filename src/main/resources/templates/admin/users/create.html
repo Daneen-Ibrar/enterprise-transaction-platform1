@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Create User</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        label { display: block; margin: 10px 0 5px; }
+        input, select { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
+        button { padding: 8px 20px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1e5c2a; }
+        .error { color: red; margin: 10px 0; }
+        .checkbox-group { max-width: 400px; }
+        .checkbox-group label { display: inline-block; margin-right: 15px; }
+    </style>
+</head>
+<body>
+    <h1>➕ Create New User</h1>
+    <a href="/admin/users">← Back to User List</a>
+
+    <div th:if="${error}" class="error" th:text="${error}"></div>
+
+    <form method="post" th:action="@{/admin/users}">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required />
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required minlength="6" />
+
+        <label>Roles:</label>
+        <div class="checkbox-group">
+            <div th:each="role : ${allRoles}">
+                <input type="checkbox" th:id="'role_' + ${role.id}" th:name="roleIds" th:value="${role.id}" />
+                <label th:for="'role_' + ${role.id}" th:text="${role.name}">ROLE</label>
+            </div>
+        </div>
+        <p style="font-size: 0.8em; color: #888;">If no role selected, user will be assigned CUSTOMER.</p>
+
+        <button type="submit">Create User</button>
+    </form>
+</body>
+</html>

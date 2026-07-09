@@ -39,6 +39,17 @@ public class Invoice {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "risk_level")
+private String riskLevel = "GREEN";
+
+@Column(name = "suspicion_reason", columnDefinition = "TEXT")
+private String suspicionReason;
+
+public String getRiskLevel() { return riskLevel; }
+public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+public String getSuspicionReason() { return suspicionReason; }
+public void setSuspicionReason(String suspicionReason) { this.suspicionReason = suspicionReason; }
+
     // Constructors
     public Invoice() {}
 
