@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>User Management</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-create { background: #2d7a3a; color: white; padding: 8px 16px; }
+        .btn-deactivate { background: #e67e22; color: white; }
+        .btn-activate { background: #2d7a3a; color: white; }
+        .btn-delete { background: #c0392b; color: white; }
+        .search-box { margin: 10px 0; }
+        .search-box input { padding: 5px; width: 250px; }
+        .search-box button { padding: 5px 15px; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-active { background: #d4edda; color: #155724; }
+        .badge-inactive { background: #f8d7da; color: #721c24; }
+        .role-tag { background: #e9ecef; padding: 2px 8px; border-radius: 12px; margin: 2px; display: inline-block; }
+        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
+        .flash-error { background: #f8d7da; color: #721c24; padding: 10px; border: 1px solid #f5c6cb; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>👥 User Management</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+    <a href="/admin/users/create" class="btn btn-create" style="margin-left: 20px;">+ Create New User</a>
+
+    <!-- Flash messages -->
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+
+    <!-- Search & Filter -->
+    <div class="search-box">
+        <form method="get" th:action="@{/admin/users}">
+            <input type="text" name="search" placeholder="Search by email..." th:value="${search}" />
+            <select name="role">
+                <option value="">All Roles</option>
+                <option th:each="r : ${allRoles}" th:value="${r.name}" th:text="${r.name}" th:selected="${selectedRole == r.name}"></option>
+            </select>
+            <button type="submit">Search</button>
+            <a th:href="@{/admin/users}" th:if="${search != null or selectedRole != null}">Clear</a>
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Roles</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="user : ${users}">
+                <td th:text="${user.id}">1</td>
+                <td th:text="${user.email}">user@test.com</td>
+                <td>
+                    <span th:each="role : ${user.roles}" class="role-tag" th:text="${role.name}">ROLE</span>
+                    <span th:if="${user.roles.empty}" style="color: #999;">No roles</span>
+                </td>
+                <td>
+                    <span th:classappend="${user.active ? 'badge-active' : 'badge-inactive'}" class="badge" th:text="${user.active ? 'Active' : 'Inactive'}">Active</span>
+                </td>
+                <td th:text="${user.createdAt}">2026-01-01</td>
+                <td>
+                    <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-edit">✏️ Edit</a>
+                    <form method="post" th:action="@{/admin/users/{id}(id=${user.id})}" style="display:inline;">
+                        <input type="hidden" name="active" th:value="${!user.active}" />
+                        <button type="submit" class="btn" th:classappend="${user.active ? 'btn-deactivate' : 'btn-activate'}" th:text="${user.active ? 'Deactivate' : 'Activate'}"></button>
+                    </form>
+                </td>
+            </tr>
+            <tr th:if="${users.empty}">
+                <td colspan="6">No users found.</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

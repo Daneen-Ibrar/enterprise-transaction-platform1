@@ -1,5 +1,6 @@
 package com.enterprise.config;
 
+import com.enterprise.feature.FeatureFlagService;
 import com.enterprise.security.ApiKeyAuthenticationFilter;
 import com.enterprise.security.CustomAuthenticationSuccessHandler;
 import com.enterprise.security.CustomPermissionEvaluator;
@@ -26,15 +27,18 @@ public class SecurityConfig {
     private final CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
+    private final FeatureFlagService featureFlagService;   // <-- ADDED
 
     public SecurityConfig(CustomPermissionEvaluator customPermissionEvaluator,
                           CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler,
                           ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
-                          RateLimitingFilter rateLimitingFilter) {
+                          RateLimitingFilter rateLimitingFilter,
+                          FeatureFlagService featureFlagService) {   // <-- ADDED
         this.customPermissionEvaluator = customPermissionEvaluator;
         this.customAuthenticationSuccessHandler = customAuthenticationSuccessHandler;
         this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
         this.rateLimitingFilter = rateLimitingFilter;
+        this.featureFlagService = featureFlagService;
     }
 
     @Bean
@@ -55,8 +59,8 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/login?logout")
                 .permitAll()
             )
-            // Add 2FA filter
-            .addFilterAfter(new TwoFactorAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+            // Add 2FA filter – using the constructor with FeatureFlagService
+            .addFilterAfter(new TwoFactorAuthenticationFilter(featureFlagService), UsernamePasswordAuthenticationFilter.class)
             // Add API Key authentication and rate limiting filters
             .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(rateLimitingFilter, ApiKeyAuthenticationFilter.class);

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Reconciliation Detail</title>
+</head>
+<body>
+    <h1>Reconciliation Report #<span th:text="${record.id}">1</span></h1>
+    <p>Status: <span th:text="${record.status}">PASS</span></p>
+    <p>Total: <span th:text="${record.totalTransactions}">0</span></p>
+    <p>Matched: <span th:text="${record.matchedTransactions}">0</span></p>
+    <p>Mismatched: <span th:text="${record.mismatchedTransactions}">0</span></p>
+    <h2>Details</h2>
+    <ul>
+        <li th:each="detail : ${details}">
+            <span th:text="${detail.discrepancyType}">MISSING_LEDGER</span> –
+            <span th:text="${detail.description}">desc</span>
+        </li>
+    </ul>
+    <a href="/admin/reconciliation">← Back</a>
+</body>
+</html>

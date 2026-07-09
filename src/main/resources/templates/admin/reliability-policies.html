@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Reliability Policies</title>
+</head>
+<body>
+    <h1>🔧 Retry Policies</h1>
+    <table border="1">
+        <tr><th>Operation</th><th>Max Attempts</th><th>Strategy</th></tr>
+        <tr th:each="p : ${retryPolicies}">
+            <td th:text="${p.operationType}">tx</td>
+            <td th:text="${p.maxAttempts}">3</td>
+            <td th:text="${p.backoffStrategy}">EXPONENTIAL</td>
+        </tr>
+    </table>
+
+    <h1>⚡ Circuit Breaker Policies</h1>
+    <table border="1">
+        <tr><th>Operation</th><th>Failure Threshold</th><th>Timeout (ms)</th></tr>
+        <tr th:each="p : ${circuitBreakerPolicies}">
+            <td th:text="${p.operationType}">tx</td>
+            <td th:text="${p.failureThreshold}">5</td>
+            <td th:text="${p.timeoutMs}">30000</td>
+        </tr>
+    </table>
+    <a href="/dashboard">← Back</a>
+</body>
+</html>
