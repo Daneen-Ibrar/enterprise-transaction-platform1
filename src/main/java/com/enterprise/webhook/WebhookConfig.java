@@ -2,9 +2,11 @@ package com.enterprise.webhook;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "webhook_config")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class WebhookConfig {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -2,9 +2,11 @@ package com.enterprise.reliability;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "dlq_entry")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class DlqEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

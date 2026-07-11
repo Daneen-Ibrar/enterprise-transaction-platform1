@@ -35,6 +35,12 @@
         </div>
         <p style="font-size: 0.8em; color: #888;">If no role selected, user will be assigned CUSTOMER.</p>
 
+        <!-- ===== TENANT DROPDOWN ===== -->
+        <label for="tenantId">Tenant:</label>
+        <select id="tenantId" name="tenantId" required>
+            <option th:each="t : ${allTenants}" th:value="${t.id}" th:text="${t.name}"></option>
+        </select>
+
         <button type="submit">Create User</button>
     </form>
 </body>

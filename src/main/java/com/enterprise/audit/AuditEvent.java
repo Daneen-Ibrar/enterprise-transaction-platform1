@@ -2,9 +2,11 @@ package com.enterprise.audit;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "audit_event")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class AuditEvent {
 
     @Id
