@@ -3,9 +3,11 @@ package com.enterprise.invoice;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "invoice")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Invoice {
 
     @Id

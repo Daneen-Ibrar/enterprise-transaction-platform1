@@ -8,6 +8,7 @@ com/enterprise/reconciliation/ReconciliationScheduler.class
 com/enterprise/api/InvoiceController.class
 com/enterprise/audit/AuditEvent.class
 com/enterprise/invoice/InvoiceMessage.class
+com/enterprise/config/WebMvcConfig.class
 com/enterprise/api/ReportingController.class
 com/enterprise/api/AdminWebhookController.class
 com/enterprise/reliability/RetryPolicy.class
@@ -20,6 +21,7 @@ com/enterprise/apikey/ApiKeyRepository.class
 com/enterprise/invoice/SuspicionRuleRepository.class
 com/enterprise/apikey/ApiKey.class
 com/enterprise/invoice/ApprovalService.class
+com/enterprise/tenant/Tenant.class
 com/enterprise/identity/Permission.class
 com/enterprise/invoice/PrivateMessageService.class
 com/enterprise/api/AdminApprovalController.class
@@ -68,6 +70,8 @@ com/enterprise/api/NotificationController.class
 com/enterprise/security/RateLimitingFilter.class
 com/enterprise/reconciliation/ReconciliationRecordRepository.class
 com/enterprise/notification/EmailTemplates.class
+com/enterprise/aop/TenantFilterAspect.class
+com/enterprise/api/AdminTenantController.class
 com/enterprise/api/HomeController.class
 com/enterprise/api/AdminViewController.class
 com/enterprise/webhook/WebhookService.class
@@ -83,11 +87,14 @@ com/enterprise/identity/PermissionRepository.class
 com/enterprise/transaction/TransactionStatus.class
 com/enterprise/api/AuditController.class
 com/enterprise/notification/StubEmailService.class
+com/enterprise/web/TenantInterceptor.class
 com/enterprise/invoice/SuspicionService$SuspicionResult.class
 com/enterprise/reporting/ReportingService.class
+com/enterprise/tenant/TenantContext.class
 com/enterprise/webhook/WebhookRepository.class
 com/enterprise/invoice/InvoiceMessageRepository.class
 com/enterprise/reliability/CircuitBreakerStateRepository.class
+com/enterprise/tenant/TenantRepository.class
 com/enterprise/api/ExportController.class
 com/enterprise/api/DashboardController.class
 com/enterprise/reliability/RecoveryService.class

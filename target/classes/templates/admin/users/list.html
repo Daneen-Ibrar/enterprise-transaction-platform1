@@ -29,11 +29,9 @@
     <a href="/dashboard">← Back to Dashboard</a>
     <a href="/admin/users/create" class="btn btn-create" style="margin-left: 20px;">+ Create New User</a>
 
-    <!-- Flash messages -->
     <div th:if="${success}" class="flash-success" th:text="${success}"></div>
     <div th:if="${error}" class="flash-error" th:text="${error}"></div>
 
-    <!-- Search & Filter -->
     <div class="search-box">
         <form method="get" th:action="@{/admin/users}">
             <input type="text" name="search" placeholder="Search by email..." th:value="${search}" />
@@ -52,6 +50,7 @@
                 <th>ID</th>
                 <th>Email</th>
                 <th>Roles</th>
+                <th>Tenant</th>        <!-- NEW COLUMN -->
                 <th>Status</th>
                 <th>Created</th>
                 <th>Actions</th>
@@ -65,6 +64,7 @@
                     <span th:each="role : ${user.roles}" class="role-tag" th:text="${role.name}">ROLE</span>
                     <span th:if="${user.roles.empty}" style="color: #999;">No roles</span>
                 </td>
+                <td th:text="${user.tenantName}">default</td>   <!-- TENANT NAME -->
                 <td>
                     <span th:classappend="${user.active ? 'badge-active' : 'badge-inactive'}" class="badge" th:text="${user.active ? 'Active' : 'Inactive'}">Active</span>
                 </td>
@@ -78,7 +78,7 @@
                 </td>
             </tr>
             <tr th:if="${users.empty}">
-                <td colspan="6">No users found.</td>
+                <td colspan="7">No users found.</td>
             </tr>
         </tbody>
     </table>

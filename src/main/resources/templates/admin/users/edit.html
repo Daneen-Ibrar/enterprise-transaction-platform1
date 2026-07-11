@@ -32,7 +32,13 @@
                 <label th:for="'role_' + ${role.id}" th:text="${role.name}">ROLE</label>
             </div>
         </div>
-
+<label for="tenantId">Tenant:</label>
+<select id="tenantId" name="tenantId" required>
+    <option th:each="t : ${allTenants}" 
+            th:value="${t.id}" 
+            th:text="${t.name}" 
+            th:selected="${t.id == user.tenantId}"></option>
+</select>
         <div class="status-box">
             <label>
                 <input type="checkbox" name="active" value="true" th:checked="${user.active}" />
