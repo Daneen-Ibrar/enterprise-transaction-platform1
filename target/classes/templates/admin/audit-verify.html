@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Audit Verification</title>
+    <style>
+        .valid { color: green; }
+        .invalid { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Audit Chain Verification</h1>
+    <p>Status: <span th:text="${status}" th:classappend="${valid ? 'valid' : 'invalid'}"></span></p>
+    <a href="/dashboard">← Back to Dashboard</a>
+</body>
+</html>

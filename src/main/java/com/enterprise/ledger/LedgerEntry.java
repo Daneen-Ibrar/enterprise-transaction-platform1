@@ -3,9 +3,11 @@ package com.enterprise.ledger;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "ledger_entry")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class LedgerEntry {
 
     @Id

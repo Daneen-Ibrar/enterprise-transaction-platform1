@@ -35,6 +35,14 @@ public class LedgerService {
         // ledgerRepository.save(entry);
     }
 
+    @Transactional
+public void reverseTransaction(Long transactionId, BigDecimal amount) {
+    // Fetch all ledger entries for the transaction and create opposite entries.
+    // Or just record compensation entries.
+    // This is a placeholder – implement based on your ledger model.
+}
+
+
     // For testing
     public BigDecimal getBalance(Long accountId) {
         return balances.getOrDefault(accountId, BigDecimal.ZERO);

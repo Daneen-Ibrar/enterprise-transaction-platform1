@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "idempotency_key")
+
 public class IdempotencyKey {
 
     @Id

@@ -1,0 +1,2 @@
+ALTER TABLE app_user ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE app_user ADD COLUMN secret_key VARCHAR(255);

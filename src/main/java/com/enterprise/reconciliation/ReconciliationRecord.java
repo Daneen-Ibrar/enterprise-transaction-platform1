@@ -2,9 +2,11 @@ package com.enterprise.reconciliation;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "reconciliation_record")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ReconciliationRecord {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

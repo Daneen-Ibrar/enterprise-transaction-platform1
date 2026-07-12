@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>2FA Status</title>
+</head>
+<body>
+    <h1>🔐 2FA Status</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+    <p>✅ Two‑factor authentication is <strong>enabled</strong>.</p>
+    <form method="post" th:action="@{/2fa/disable}">
+        <button type="submit">Disable 2FA</button>
+    </form>
+</body>
+</html>

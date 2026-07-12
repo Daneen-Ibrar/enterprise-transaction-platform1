@@ -12,6 +12,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    shm_size: 128mb
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - app-network
+    command: >
+      postgres -c tcp_keepalives_idle=60
+               -c tcp_keepalives_interval=10
+               -c tcp_keepalives_count=5
+               -c idle_in_transaction_session_timeout=60000
 
   redis:
     image: redis:7-alpine
@@ -22,6 +37,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
 
   app:
     build: .
@@ -33,14 +51,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/transaction_platform
       SPRING_DATASOURCE_USERNAME: platform_user
       SPRING_DATASOURCE_PASSWORD: dev_password
       SPRING_DATA_REDIS_HOST: redis
-      # Force proxy headers
       SERVER_FORWARD_HEADERS_STRATEGY: native
-      # Test users – these MUST exist
       TEST_CUSTOMER_EMAIL: customer@test.com
       TEST_CUSTOMER_PASSWORD: password123
       TEST_MERCHANT_EMAIL: merchant@test.com
@@ -49,3 +64,20 @@ services:
       TEST_ADMIN_PASSWORD: password123
       TEST_AUDITOR_EMAIL: auditor@test.com
       TEST_AUDITOR_PASSWORD: password123
+      MAIL_USERNAME: daneen.ibrar@gmail.com
+      MAIL_PASSWORD: rrakleuwvhmtanfz
+      APP_EMAIL_MODE: stub
+      JAVA_OPTS: "-Xmx512m -Xms256m -Dnetworkaddress.cache.ttl=10 -Dnetworkaddress.cache.negative.ttl=10"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AuditService {
@@ -26,23 +27,29 @@ public class AuditService {
         this.objectMapper = objectMapper;
     }
 
+    // ----- Full recordEvent with snapshots -----
     @Transactional
-    public AuditEvent recordEvent(String eventType, Long userId, Object details) {
+    public AuditEvent recordEvent(String eventType, Long userId, Object details,
+                                  String entityType, Long entityId,
+                                  Object previousState, Object currentState) {
         try {
-            // 1. Serialize details to JSON
             String detailsJson = objectMapper.writeValueAsString(details);
+            String previousJson = previousState != null ? objectMapper.writeValueAsString(previousState) : null;
+            String currentJson = currentState != null ? objectMapper.writeValueAsString(currentState) : null;
 
-            // 2. Get the previous event (latest)
             String previousHash = auditRepository.findFirstByOrderByCreatedAtDesc()
                     .map(AuditEvent::getCurrentHash)
                     .orElse("");
 
-            // 3. Compute hash: SHA‑256(previousHash + detailsJson + eventType + userId)
             String input = previousHash + detailsJson + eventType + userId;
             String currentHash = hash(input);
 
-            // 4. Create and persist the event
             AuditEvent event = new AuditEvent(eventType, userId, detailsJson, previousHash, currentHash);
+            event.setEntityType(entityType);
+            event.setEntityId(entityId);
+            event.setPreviousState(previousJson);
+            event.setCurrentState(currentJson);
+
             return auditRepository.save(event);
 
         } catch (JsonProcessingException | NoSuchAlgorithmException e) {
@@ -51,13 +58,18 @@ public class AuditService {
         }
     }
 
+    // ----- Legacy recordEvent (without snapshots) -----
+    @Transactional
+    public AuditEvent recordEvent(String eventType, Long userId, Object details) {
+        return recordEvent(eventType, userId, details, null, null, null, null);
+    }
+
     private String hash(String input) throws NoSuchAlgorithmException {
         MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
         byte[] hashBytes = digest.digest(input.getBytes());
         return HexFormat.of().formatHex(hashBytes);
     }
 
-    // Verification: check the entire chain
     public boolean verifyChain() {
         List<AuditEvent> events = auditRepository.findAll();
         if (events.isEmpty()) return true;
@@ -69,7 +81,6 @@ public class AuditService {
                         event.getId(), expectedPreviousHash, event.getPreviousHash());
                 return false;
             }
-            // Recompute current hash
             String input = event.getPreviousHash() + event.getDetails() + event.getEventType() + event.getUserId();
             try {
                 String recomputed = hash(input);
@@ -93,5 +104,9 @@ public class AuditService {
 
     public List<AuditEvent> getAllEvents() {
         return auditRepository.findAll();
+    }
+
+    public Optional<AuditEvent> getEventById(Long id) {
+        return auditRepository.findById(id);
     }
 }

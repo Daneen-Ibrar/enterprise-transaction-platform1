@@ -2,9 +2,11 @@ package com.enterprise.notification;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "notification")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Notification {
 
     @Id
@@ -30,6 +32,10 @@ public class Notification {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    // ===== TENANT ID (NEW) =====
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     // Constructors
     public Notification() {}
@@ -59,4 +65,7 @@ public class Notification {
     public void setRead(boolean read) { this.read = read; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

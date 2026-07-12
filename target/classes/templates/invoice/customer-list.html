@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>My Invoices</title></head>
+<body>
+    <h1>My Invoices</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+    <table border="1">
+        <tr><th>ID</th><th>Amount</th><th>Description</th><th>Status</th><th>Action</th></tr>
+        <tr th:each="inv : ${invoices}">
+            <td th:text="${inv.id}">1</td>
+            <td th:text="${inv.amount}">100</td>
+            <td th:text="${inv.description}">desc</td>
+            <td th:text="${inv.status}">APPROVED</td>
+            <td>
+                <!-- ✅ Redirects to the styled public gateway -->
+                <a th:if="${inv.status == 'APPROVED'}" th:href="@{/pay/{id}(id=${inv.id})}" class="btn">Pay Now</a>
+                <a th:href="@{/invoices/{id}(id=${inv.id})}">View</a>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

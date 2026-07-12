@@ -2,9 +2,11 @@ package com.enterprise.audit;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "audit_event")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class AuditEvent {
 
     @Id
@@ -29,6 +31,19 @@ public class AuditEvent {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    // ----- DIFF FIELDS (TEXT to avoid casting issues) -----
+    @Column(name = "entity_type")
+    private String entityType;
+
+    @Column(name = "entity_id")
+    private Long entityId;
+
+    @Column(name = "previous_state", columnDefinition = "TEXT")
+    private String previousState;
+
+    @Column(name = "current_state", columnDefinition = "TEXT")
+    private String currentState;
+
     // Constructors
     public AuditEvent() {}
 
@@ -41,7 +56,7 @@ public class AuditEvent {
         this.currentHash = currentHash;
     }
 
-    // Getters and setters
+    // Getters and setters (all fields)
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getEventType() { return eventType; }
@@ -56,4 +71,13 @@ public class AuditEvent {
     public void setCurrentHash(String currentHash) { this.currentHash = currentHash; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getEntityType() { return entityType; }
+    public void setEntityType(String entityType) { this.entityType = entityType; }
+    public Long getEntityId() { return entityId; }
+    public void setEntityId(Long entityId) { this.entityId = entityId; }
+    public String getPreviousState() { return previousState; }
+    public void setPreviousState(String previousState) { this.previousState = previousState; }
+    public String getCurrentState() { return currentState; }
+    public void setCurrentState(String currentState) { this.currentState = currentState; }
 }

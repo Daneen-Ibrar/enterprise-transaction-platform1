@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Audit Events</title>
+</head>
+<body>
+    <h1>Audit Events</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+    <button id="verifyBtn">Verify Chain Integrity</button>
+    <div id="verifyResult"></div>
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr><th>ID</th><th>Type</th><th>User</th><th>Details</th><th>Previous Hash</th><th>Current Hash</th><th>Created</th></tr>
+        </thead>
+        <tbody>
+            <tr th:each="event : ${events.content}">
+                <td th:text="${event.id}">1</td>
+                <td th:text="${event.eventType}">PAYMENT_SETTLED</td>
+                <td th:text="${event.userId}">1</td>
+                <td th:text="${event.details}">{...}</td>
+                <td th:text="${event.previousHash}">abc</td>
+                <td th:text="${event.currentHash}">def</td>
+                <td th:text="${event.createdAt}">2026-01-01</td>
+            </tr>
+        </tbody>
+    </table>
+    <div>Page <span th:text="${currentPage + 1}">1</span> of <span th:text="${totalPages}">1</span></div>
+
+    <script>
+        document.getElementById('verifyBtn').addEventListener('click', function() {
+            fetch('/api/audit/verify')   // <-- changed from /audit/verify
+                .then(response => response.json())
+                .then(data => {
+                    const result = document.getElementById('verifyResult');
+                    result.innerHTML = `<p><strong>Status:</strong> ${data.status}</p>`;
+                    result.style.color = data.valid ? 'green' : 'red';
+                });
+        });
+    </script>
+</body>
+</html>

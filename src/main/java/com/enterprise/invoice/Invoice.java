@@ -3,9 +3,11 @@ package com.enterprise.invoice;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "invoice")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Invoice {
 
     @Id
@@ -14,6 +16,9 @@ public class Invoice {
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
+
+    @Column(length = 3)
+    private String currency = "GBP";
 
     @Column(nullable = false)
     private String description;
@@ -36,6 +41,17 @@ public class Invoice {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "risk_level")
+private String riskLevel = "GREEN";
+
+@Column(name = "suspicion_reason", columnDefinition = "TEXT")
+private String suspicionReason;
+
+public String getRiskLevel() { return riskLevel; }
+public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+public String getSuspicionReason() { return suspicionReason; }
+public void setSuspicionReason(String suspicionReason) { this.suspicionReason = suspicionReason; }
+
     // Constructors
     public Invoice() {}
 
@@ -48,75 +64,33 @@ public class Invoice {
     }
 
     // Getters and setters
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
 
-    public BigDecimal getAmount() {
-        return amount;
-    }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
 
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public String getDescription() {
-        return description;
-    }
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    public Long getMerchantId() { return merchantId; }
+    public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
 
-    public String getCustomerEmail() {
-        return customerEmail;
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public void setCustomerEmail(String customerEmail) {
-        this.customerEmail = customerEmail;
-    }
+    public boolean isRequiresApproval() { return requiresApproval; }
+    public void setRequiresApproval(boolean requiresApproval) { this.requiresApproval = requiresApproval; }
 
-    public Long getMerchantId() {
-        return merchantId;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public void setMerchantId(Long merchantId) {
-        this.merchantId = merchantId;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public boolean isRequiresApproval() {
-        return requiresApproval;
-    }
-
-    public void setRequiresApproval(boolean requiresApproval) {
-        this.requiresApproval = requiresApproval;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

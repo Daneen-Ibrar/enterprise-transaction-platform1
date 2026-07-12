@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Audit Log</title>
+</head>
+<body>
+    <h1>Audit Log</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Event Type</th>
+                <th>User</th>
+                <th>Details</th>
+                <th>Created</th>
+                <th>Diff</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="event : ${events.content}">
+                <td th:text="${event.id}">1</td>
+                <td th:text="${event.eventType}">PAYMENT_SETTLED</td>
+                <td th:text="${event.userId}">1</td>
+                <td th:text="${event.details}">{...}</td>
+                <td th:text="${event.createdAt}">2026-01-01</td>
+                <td>
+                    <a th:if="${event.previousState != null && event.currentState != null}"
+                       th:href="@{/admin/audit/diff/{id}(id=${event.id})}">🔍 Diff</a>
+                    <span th:unless="${event.previousState != null && event.currentState != null}">—</span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

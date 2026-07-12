@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <title>Transaction Detail</title>
+</head>
+<body>
+    <h1>Transaction #<span th:text="${transaction.id}">1</span></h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <table>
+        <tr><th>Invoice</th><td th:text="${transaction.invoiceId}">100</td></tr>
+        <tr><th>Customer</th><td th:text="${transaction.customerId}">1</td></tr>
+        <tr><th>Merchant</th><td th:text="${transaction.merchantId}">2</td></tr>
+        <tr><th>Amount</th><td th:text="${transaction.amount}">100.00</td></tr>
+        <tr><th>Status</th><td th:text="${transaction.status}">SETTLED</td></tr>
+        <tr><th>Created</th><td th:text="${transaction.createdAt}">2026-01-01</td></tr>
+        <tr th:if="${transaction.updatedAt}"><th>Updated</th><td th:text="${transaction.updatedAt}">2026-01-02</td></tr>
+    </table>
+
+    <!-- Settlement Timeline -->
+    <h3>Settlement Timeline</h3>
+    <ul style="list-style: none; padding: 0;">
+        <li th:each="state : ${#strings.listSplit('PENDING,AUTHORISED,SETTLED,REFUNDED', ',')}">
+            <span th:style="'color:' + (state == transaction.status.name() ? 'green' : 'gray')">
+                ${state} <span th:if="${state == transaction.status.name()}">✔</span>
+            </span>
+        </li>
+    </ul>
+
+    <a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>

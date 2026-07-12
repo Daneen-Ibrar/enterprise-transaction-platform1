@@ -2,9 +2,11 @@ package com.enterprise.reliability;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "dlq_entry")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class DlqEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,8 +21,8 @@ public class DlqEntry {
     @Column(name = "failure_reason", nullable = false, columnDefinition = "TEXT")
     private String failureReason;
 
-    @Column(name = "failure_count", nullable = false)
-    private int failureCount = 1;
+     @Column(name = "failure_count", nullable = false)
+private int failureCount = 1;
 
     @Column(nullable = false)
     private String status = "PENDING"; // PENDING, RETRYING, RESOLVED, FAILED
@@ -30,6 +32,8 @@ public class DlqEntry {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+
 
     // Getters and setters
     public Long getId() { return id; }
