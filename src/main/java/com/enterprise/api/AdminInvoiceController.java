@@ -6,6 +6,7 @@ import com.enterprise.invoice.InvoiceMessage;
 import com.enterprise.invoice.InvoiceMessageService;
 import com.enterprise.invoice.InvoiceRepository;
 import com.enterprise.invoice.InvoiceService;
+import com.enterprise.invoice.SuspicionService;   // <-- ADDED
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
@@ -31,20 +32,23 @@ public class AdminInvoiceController {
     private final InvoiceMessageService messageService;
     private final InvoiceRepository invoiceRepository;
     private final NotificationService notificationService;
-    private final FeatureFlagService featureFlagService;   // <-- ADDED
+    private final FeatureFlagService featureFlagService;
+    private final SuspicionService suspicionService;   // <-- ADDED
 
     public AdminInvoiceController(InvoiceService invoiceService,
                                   UserRepository userRepository,
                                   InvoiceMessageService messageService,
                                   InvoiceRepository invoiceRepository,
                                   NotificationService notificationService,
-                                  FeatureFlagService featureFlagService) {
+                                  FeatureFlagService featureFlagService,
+                                  SuspicionService suspicionService) {   // <-- ADDED
         this.invoiceService = invoiceService;
         this.userRepository = userRepository;
         this.messageService = messageService;
         this.invoiceRepository = invoiceRepository;
         this.notificationService = notificationService;
         this.featureFlagService = featureFlagService;
+        this.suspicionService = suspicionService;
     }
 
     // ----- Pending (only non-suspicious, GREEN risk) -----
@@ -160,6 +164,7 @@ public class AdminInvoiceController {
         return "admin/invoices/rejected";
     }
 
+    // ----- FIX: Reapprove with re-evaluation of suspicion -----
     @PostMapping("/{id}/reapprove")
     public String reapproveInvoice(@PathVariable Long id, Authentication authentication) {
         AppUser admin = userRepository.findByEmail(authentication.getName())
@@ -169,6 +174,15 @@ public class AdminInvoiceController {
         if (!"REJECTED".equals(invoice.getStatus())) {
             throw new IllegalStateException("Only rejected invoices can be reapproved");
         }
+
+        // ----- FIX: Re-evaluate risk level before approving -----
+        SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
+        invoice.setRiskLevel(result.getRiskLevel());
+        invoice.setSuspicionReason(result.getReason());
+
+        // If risk is not GREEN, we may want to keep it pending or handle differently.
+        // For now, we approve and update status, but we could also set to PENDING_APPROVAL if suspicious.
+        // We'll set status to APPROVED.
         invoice.setStatus("APPROVED");
         invoice.setUpdatedAt(LocalDateTime.now());
         invoiceRepository.save(invoice);

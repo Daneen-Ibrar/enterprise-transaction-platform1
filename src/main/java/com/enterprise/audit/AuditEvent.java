@@ -19,7 +19,8 @@ public class AuditEvent {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(columnDefinition = "JSONB", nullable = false)
+    // FIXED: columnDefinition = "TEXT" (was JSONB in code, but migration V4 changed to TEXT)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String details;
 
     @Column(name = "previous_hash", nullable = false, length = 64)
@@ -38,11 +39,16 @@ public class AuditEvent {
     @Column(name = "entity_id")
     private Long entityId;
 
+    // FIXED: columnDefinition = "TEXT" (was JSONB in code, but migration V29 changed to TEXT)
     @Column(name = "previous_state", columnDefinition = "TEXT")
     private String previousState;
 
     @Column(name = "current_state", columnDefinition = "TEXT")
     private String currentState;
+
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     // Constructors
     public AuditEvent() {}
@@ -56,7 +62,7 @@ public class AuditEvent {
         this.currentHash = currentHash;
     }
 
-    // Getters and setters (all fields)
+    // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getEventType() { return eventType; }
@@ -71,7 +77,6 @@ public class AuditEvent {
     public void setCurrentHash(String currentHash) { this.currentHash = currentHash; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
     public String getEntityType() { return entityType; }
     public void setEntityType(String entityType) { this.entityType = entityType; }
     public Long getEntityId() { return entityId; }
@@ -80,4 +85,6 @@ public class AuditEvent {
     public void setPreviousState(String previousState) { this.previousState = previousState; }
     public String getCurrentState() { return currentState; }
     public void setCurrentState(String currentState) { this.currentState = currentState; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

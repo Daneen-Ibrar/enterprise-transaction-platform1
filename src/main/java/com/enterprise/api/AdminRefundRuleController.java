@@ -2,6 +2,7 @@ package com.enterprise.api;
 
 import com.enterprise.refund.RefundRule;
 import com.enterprise.refund.RefundRuleRepository;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,7 +26,6 @@ public class AdminRefundRuleController {
         this.ruleRepository = ruleRepository;
     }
 
-    // ----- List all rules with threshold -----
     @GetMapping
     public String listRules(@RequestParam(required = false) String search, Model model) {
         List<RefundRule> rules = ruleRepository.findAll();
@@ -38,12 +38,10 @@ public class AdminRefundRuleController {
         model.addAttribute("rules", rules);
         model.addAttribute("search", search);
 
-        // Extract current threshold from the "ALLOW" rule (if any)
         BigDecimal threshold = null;
         for (RefundRule rule : rules) {
             if ("ALLOW".equals(rule.getAction()) && rule.getConditionExpression().contains("amount")) {
                 String expr = rule.getConditionExpression();
-                // Handle expressions like "amount <= 1000" or "amount < 1000"
                 String[] parts = expr.replace("amount", "").trim().split("\\s+");
                 if (parts.length >= 2) {
                     try {
@@ -57,36 +55,40 @@ public class AdminRefundRuleController {
         return "admin/refund-rules/list";
     }
 
-    // ----- Quick threshold settings -----
-   @PostMapping("/settings")
-public String saveSettings(@RequestParam BigDecimal threshold,
-                           RedirectAttributes redirectAttributes) {
-    try {
-        ruleRepository.deleteAll();
+    @PostMapping("/settings")
+    public String saveSettings(@RequestParam BigDecimal threshold,
+                               RedirectAttributes redirectAttributes) {
+        try {
+            ruleRepository.deleteAll();
 
-        RefundRule allowRule = new RefundRule();
-        allowRule.setRulePriority(1);
-        allowRule.setConditionExpression("#amount <= " + threshold);   // ✅ fixed
-        allowRule.setAction("ALLOW");
-        allowRule.setActive(true);
-        ruleRepository.save(allowRule);
+            RefundRule allowRule = new RefundRule();
+            allowRule.setRulePriority(1);
+            allowRule.setConditionExpression("#amount <= " + threshold);
+            allowRule.setAction("ALLOW");
+            allowRule.setActive(true);
+            // ----- FIX: Set tenant ID -----
+            Long tenantId = TenantContext.getTenantId();
+            allowRule.setTenantId(tenantId != null ? tenantId : 1L);
+            ruleRepository.save(allowRule);
 
-        RefundRule denyRule = new RefundRule();
-        denyRule.setRulePriority(2);
-        denyRule.setConditionExpression("#amount > " + threshold);    // ✅ fixed
-        denyRule.setAction("DENY");
-        denyRule.setActive(true);
-        ruleRepository.save(denyRule);
+            RefundRule denyRule = new RefundRule();
+            denyRule.setRulePriority(2);
+            denyRule.setConditionExpression("#amount > " + threshold);
+            denyRule.setAction("DENY");
+            denyRule.setActive(true);
+            // ----- FIX: Set tenant ID -----
+            denyRule.setTenantId(tenantId != null ? tenantId : 1L);
+            ruleRepository.save(denyRule);
 
-        redirectAttributes.addFlashAttribute("success",
-                "Refund threshold updated. Amounts up to £" + threshold + " are refundable.");
-    } catch (Exception e) {
-        log.error("Error saving refund threshold", e);
-        redirectAttributes.addFlashAttribute("error", "Failed to save threshold: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("success",
+                    "Refund threshold updated. Amounts up to £" + threshold + " are refundable.");
+        } catch (Exception e) {
+            log.error("Error saving refund threshold", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to save threshold: " + e.getMessage());
+        }
+        return "redirect:/admin/refund-rules";
     }
-    return "redirect:/admin/refund-rules";
-}
-    // ----- Create rule (full form) -----
+
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("rule", new RefundRule());
@@ -97,6 +99,9 @@ public String saveSettings(@RequestParam BigDecimal threshold,
     public String createRule(@ModelAttribute RefundRule rule,
                              RedirectAttributes redirectAttributes) {
         try {
+            // ----- FIX: Set tenant ID -----
+            Long tenantId = TenantContext.getTenantId();
+            rule.setTenantId(tenantId != null ? tenantId : 1L);
             ruleRepository.save(rule);
             redirectAttributes.addFlashAttribute("success", "Refund rule created.");
         } catch (Exception e) {
@@ -106,7 +111,6 @@ public String saveSettings(@RequestParam BigDecimal threshold,
         return "redirect:/admin/refund-rules";
     }
 
-    // ----- Edit rule -----
     @GetMapping("/{id}/edit")
     public String showEditForm(@PathVariable Long id, Model model) {
         RefundRule rule = ruleRepository.findById(id)
@@ -130,7 +134,6 @@ public String saveSettings(@RequestParam BigDecimal threshold,
         return "redirect:/admin/refund-rules";
     }
 
-    // ----- Delete rule -----
     @PostMapping("/{id}/delete")
     public String deleteRule(@PathVariable Long id,
                              RedirectAttributes redirectAttributes) {
@@ -144,7 +147,6 @@ public String saveSettings(@RequestParam BigDecimal threshold,
         return "redirect:/admin/refund-rules";
     }
 
-    // ----- Toggle active -----
     @PostMapping("/{id}/toggle")
     public String toggleRule(@PathVariable Long id,
                              RedirectAttributes redirectAttributes) {

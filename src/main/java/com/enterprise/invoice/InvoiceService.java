@@ -5,6 +5,7 @@ import com.enterprise.events.SuspicionEnabledEvent;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
+import com.enterprise.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +55,10 @@ public class InvoiceService {
                                  Long merchantId, boolean requiresApproval, String currency) {
         Invoice invoice = new Invoice(amount, description, customerEmail, merchantId);
         invoice.setCurrency(currency != null && !currency.isEmpty() ? currency : "GBP");
+
+        // ----- FIX: Set tenant ID -----
+        Long tenantId = TenantContext.getTenantId();
+        invoice.setTenantId(tenantId != null ? tenantId : 1L);
 
         SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
         invoice.setRiskLevel(result.getRiskLevel());
@@ -270,7 +275,6 @@ public class InvoiceService {
         }
     }
 
-    // ----- Re‑evaluate ALL invoices that are not yet paid (after approval rule changes) -----
     @Transactional
     public void reEvaluateAllInvoices() {
         List<Invoice> invoices = invoiceRepository.findByStatusIn(List.of("APPROVED", "PENDING_APPROVAL"));
@@ -317,7 +321,6 @@ public class InvoiceService {
         invoiceRepository.saveAll(invoices);
     }
 
-    // ----- Re‑evaluate all invoices for suspicion (when feature toggled on) -----
     @Transactional
     public void reEvaluateAllInvoicesForSuspicion() {
         List<Invoice> allInvoices = invoiceRepository.findAll();
@@ -339,15 +342,12 @@ public class InvoiceService {
         log.info("Re-evaluated {} invoices for suspicion; {} risk levels changed", allInvoices.size(), updated);
     }
 
-    // ----- Listen for suspicion enabled event -----
     @EventListener
     @Transactional
     public void onSuspicionEnabled(SuspicionEnabledEvent event) {
         log.info("Received SuspicionEnabledEvent – re-evaluating all invoices for suspicion");
         reEvaluateAllInvoicesForSuspicion();
     }
-
-    // ----- Helper methods -----
 
     private Long getUserIdByEmail(String email) {
         return userRepository.findByEmail(email)

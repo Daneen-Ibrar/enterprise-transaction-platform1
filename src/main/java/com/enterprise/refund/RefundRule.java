@@ -9,13 +9,27 @@ public class RefundRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "rule_priority", nullable = false)
     private int rulePriority;
+
+    @Column(name = "condition_expression", nullable = false, columnDefinition = "TEXT")
     private String conditionExpression;
-    private String action;
+
+    @Column(nullable = false)
+    private String action; // ALLOW, REQUIRE_APPROVAL, DENY
+
+    @Column(name = "required_permission")
     private String requiredPermission;
+
     private boolean active = true;
-    @Column(updatable = false)
+
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     // Getters & Setters
     public Long getId() { return id; }
@@ -32,4 +46,6 @@ public class RefundRule {
     public void setActive(boolean active) { this.active = active; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

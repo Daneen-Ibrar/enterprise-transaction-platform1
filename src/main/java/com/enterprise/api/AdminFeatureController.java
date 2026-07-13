@@ -2,6 +2,7 @@ package com.enterprise.api;
 
 import com.enterprise.feature.FeatureFlag;
 import com.enterprise.feature.FeatureFlagService;
+import com.enterprise.tenant.TenantContext;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -50,6 +51,8 @@ public class AdminFeatureController {
                                 @RequestParam String description,
                                 @RequestParam(required = false) Boolean enabled,
                                 RedirectAttributes redirectAttributes) {
+        // ----- FIX: Use the service that sets tenant ID -----
+        // The createFlag method in FeatureFlagService already sets tenant ID internally (see below)
         featureFlagService.createFlag(name, description, enabled != null && enabled);
         redirectAttributes.addFlashAttribute("success", "Feature created.");
         return "redirect:/admin/features";
