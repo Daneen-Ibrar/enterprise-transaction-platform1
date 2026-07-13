@@ -1,1 +1,0 @@
-ALTER TABLE idempotency_key ADD COLUMN IF NOT EXISTS ttl_seconds INT DEFAULT 2592000;

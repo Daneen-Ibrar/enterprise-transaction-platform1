@@ -3,7 +3,7 @@ package com.enterprise.api;
 import com.enterprise.audit.AuditRepository;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
-import com.enterprise.invoice.InvoiceService;   // <-- ADD
+import com.enterprise.invoice.InvoiceService;
 import com.enterprise.notification.NotificationService;
 import com.enterprise.reconciliation.ReconciliationRecordRepository;
 import com.enterprise.reliability.DlqEntryRepository;
@@ -23,7 +23,7 @@ public class DashboardController {
     private final DlqEntryRepository dlqEntryRepository;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
-    private final InvoiceService invoiceService;   // <-- ADD
+    private final InvoiceService invoiceService;
 
     public DashboardController(TransactionRepository transactionRepository,
                                AuditRepository auditRepository,
@@ -31,14 +31,14 @@ public class DashboardController {
                                DlqEntryRepository dlqEntryRepository,
                                NotificationService notificationService,
                                UserRepository userRepository,
-                               InvoiceService invoiceService) {   // <-- ADD
+                               InvoiceService invoiceService) {
         this.transactionRepository = transactionRepository;
         this.auditRepository = auditRepository;
         this.reconciliationRecordRepository = reconciliationRecordRepository;
         this.dlqEntryRepository = dlqEntryRepository;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
-        this.invoiceService = invoiceService;   // <-- ADD
+        this.invoiceService = invoiceService;
     }
 
     @GetMapping("/dashboard")
@@ -59,14 +59,17 @@ public class DashboardController {
         model.addAttribute("username", user.getEmail());
         model.addAttribute("roles", authentication.getAuthorities());
 
+        // Notifications
         long unreadCount = notificationService.countUnread(userId);
         var recentNotifications = notificationService.getRecentNotifications(userId, 5);
-
         model.addAttribute("unreadCount", unreadCount);
         model.addAttribute("notifications", recentNotifications);
 
-        // ----- ADD: list of invoices for suspicious widget -----
-        model.addAttribute("invoices", invoiceService.findAll()); // all invoices
+        // ----- FIX: Add suspicious count for dashboard widget -----
+        long suspiciousCount = invoiceService.findAll().stream()
+                .filter(inv -> inv.getRiskLevel() != null && !"GREEN".equals(inv.getRiskLevel()))
+                .count();
+        model.addAttribute("suspiciousCount", suspiciousCount);
 
         return "dashboard";
     }

@@ -8,6 +8,7 @@ import org.hibernate.annotations.Filter;
 @Table(name = "dlq_entry")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class DlqEntry {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -15,14 +16,15 @@ public class DlqEntry {
     @Column(name = "operation_type", nullable = false)
     private String operationType;
 
-    @Column(columnDefinition = "JSONB", nullable = false)
+    // FIXED: columnDefinition = "TEXT" (was JSONB in code, but migration V6 changed to TEXT)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String payload;
 
     @Column(name = "failure_reason", nullable = false, columnDefinition = "TEXT")
     private String failureReason;
 
-     @Column(name = "failure_count", nullable = false)
-private int failureCount = 1;
+    @Column(name = "failure_count", nullable = false)
+    private int failureCount = 1;
 
     @Column(nullable = false)
     private String status = "PENDING"; // PENDING, RETRYING, RESOLVED, FAILED
@@ -33,7 +35,9 @@ private int failureCount = 1;
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     // Getters and setters
     public Long getId() { return id; }
@@ -52,4 +56,6 @@ private int failureCount = 1;
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

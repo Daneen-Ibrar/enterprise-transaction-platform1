@@ -33,11 +33,15 @@ public class TestUserInitializer implements ApplicationRunner {
         if (email == null || password == null) {
             return;
         }
-        Role role = roleRepository.findByName(roleName).orElseThrow();
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
         AppUser user = userRepository.findByEmail(email).orElse(new AppUser());
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.getRoles().add(role);
+        // --- FIX: Set tenant ID to default tenant (1) ---
+        user.setTenantId(1L);
+        user.setActive(true);
         userRepository.save(user);
     }
 }

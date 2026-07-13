@@ -12,7 +12,7 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final UserRepository userRepository;   // <-- ADD
+    private final UserRepository userRepository;
 
     public NotificationService(NotificationRepository notificationRepository,
                                UserRepository userRepository) {
@@ -32,11 +32,12 @@ public class NotificationService {
         }
 
         Notification notification = new Notification(userId, type, title, message, link);
-        notification.setTenantId(tenantId);   // <-- SET TENANT
+        notification.setTenantId(tenantId);
 
+        // Save first
         Notification saved = notificationRepository.save(notification);
 
-        // Broadcast the new count via SSE
+        // ----- FIX: Recalculate unread count after saving -----
         long unreadCount = countUnread(userId);
         NotificationSSEController.broadcast(userId, unreadCount);
 

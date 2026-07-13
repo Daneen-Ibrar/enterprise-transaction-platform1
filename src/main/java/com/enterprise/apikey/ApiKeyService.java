@@ -25,6 +25,12 @@ public class ApiKeyService {
         apiKey.setName(name);
         apiKey.setUser(user);
         apiKey.setActive(true);
+        // ----- FIX: Set tenant ID from user -----
+        Long tenantId = user.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1L; // fallback to default tenant
+        }
+        apiKey.setTenantId(tenantId);
         return apiKeyRepository.save(apiKey);
     }
 

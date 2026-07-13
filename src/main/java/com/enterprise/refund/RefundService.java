@@ -17,6 +17,7 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -111,20 +112,46 @@ public class RefundService {
         original.setStatus(TransactionStatus.REFUNDED);
         transactionRepository.save(original);
 
-        // Audit with snapshots – before: original (before refund), after: refund
+        // ================================================================
+        // Audit with diff snapshots – FIXED: Manual maps, no Hibernate proxies
+        // ================================================================
+        Map<String, Object> beforeMap = new HashMap<>();
+        beforeMap.put("id", original.getId());
+        beforeMap.put("invoiceId", original.getInvoiceId());
+        beforeMap.put("customerId", original.getCustomerId());
+        beforeMap.put("merchantId", original.getMerchantId());
+        beforeMap.put("amount", original.getAmount());
+        beforeMap.put("currency", original.getCurrency());
+        beforeMap.put("status", original.getStatus().name());
+        beforeMap.put("idempotencyKey", original.getIdempotencyKey());
+        beforeMap.put("createdAt", original.getCreatedAt());
+        beforeMap.put("updatedAt", original.getUpdatedAt());
+
+        Map<String, Object> afterMap = new HashMap<>();
+        afterMap.put("id", refund.getId());
+        afterMap.put("invoiceId", refund.getInvoiceId());
+        afterMap.put("customerId", refund.getCustomerId());
+        afterMap.put("merchantId", refund.getMerchantId());
+        afterMap.put("amount", refund.getAmount());
+        afterMap.put("currency", refund.getCurrency());
+        afterMap.put("status", refund.getStatus().name());
+        afterMap.put("idempotencyKey", refund.getIdempotencyKey());
+        afterMap.put("createdAt", refund.getCreatedAt());
+        afterMap.put("updatedAt", refund.getUpdatedAt());
+
         auditService.recordEvent(
-            "REFUND_PROCESSED",
-            adminId,
-            Map.of(
-                "originalTransactionId", originalTransactionId,
-                "refundTransactionId", refund.getId(),
-                "amount", original.getAmount(),
-                "reason", reason
-            ),
-            "Transaction",
-            refund.getId(),
-            original,   // previous state – original transaction (still SETTLED before we changed it)
-            refund      // current state – the refund transaction
+                "REFUND_PROCESSED",
+                adminId,
+                Map.of(
+                        "originalTransactionId", originalTransactionId,
+                        "refundTransactionId", refund.getId(),
+                        "amount", original.getAmount(),
+                        "reason", reason
+                ),
+                "Transaction",
+                refund.getId(),
+                beforeMap,
+                afterMap
         );
 
         notificationService.createNotification(original.getCustomerId(),

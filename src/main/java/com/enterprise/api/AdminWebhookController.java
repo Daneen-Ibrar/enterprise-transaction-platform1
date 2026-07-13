@@ -1,6 +1,7 @@
 package com.enterprise.api;
 
 import com.enterprise.feature.FeatureFlagService;
+import com.enterprise.tenant.TenantContext;
 import com.enterprise.webhook.WebhookConfig;
 import com.enterprise.webhook.WebhookRepository;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,10 +19,10 @@ import java.util.List;
 public class AdminWebhookController {
 
     private final WebhookRepository webhookRepository;
-    private final FeatureFlagService featureFlagService;   // <-- ADDED
+    private final FeatureFlagService featureFlagService;
 
     public AdminWebhookController(WebhookRepository webhookRepository,
-                                  FeatureFlagService featureFlagService) {   // <-- ADDED
+                                  FeatureFlagService featureFlagService) {
         this.webhookRepository = webhookRepository;
         this.featureFlagService = featureFlagService;
     }
@@ -30,7 +31,7 @@ public class AdminWebhookController {
     public String listWebhooks(Model model) {
         List<WebhookConfig> webhooks = webhookRepository.findAll();
         model.addAttribute("webhooks", webhooks);
-        model.addAttribute("webhooksEnabled", featureFlagService.isEnabled("WEBHOOKS"));   // <-- ADDED
+        model.addAttribute("webhooksEnabled", featureFlagService.isEnabled("WEBHOOKS"));
         return "admin/webhooks/list";
     }
 
@@ -45,6 +46,9 @@ public class AdminWebhookController {
     public String createWebhook(@ModelAttribute WebhookConfig webhook,
                                 RedirectAttributes redirectAttributes) {
         webhook.setCreatedAt(LocalDateTime.now());
+        // ----- FIX: Set tenant ID -----
+        Long tenantId = TenantContext.getTenantId();
+        webhook.setTenantId(tenantId != null ? tenantId : 1L);
         webhookRepository.save(webhook);
         redirectAttributes.addFlashAttribute("success", "Webhook created.");
         return "redirect:/admin/webhooks";

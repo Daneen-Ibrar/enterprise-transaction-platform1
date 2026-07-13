@@ -1,6 +1,7 @@
 package com.enterprise.feature;
 
 import com.enterprise.events.SuspicionEnabledEvent;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -43,7 +44,6 @@ public class FeatureFlagService {
         repository.save(flag);
         log.info("Feature flag {} set to {}", name, enabled);
 
-        // If enabling suspicion detection, publish an event to trigger re-evaluation
         if ("SUSPICION_DETECTION".equals(name) && enabled) {
             log.info("Suspicion detection enabled – publishing re-evaluation event");
             eventPublisher.publishEvent(new SuspicionEnabledEvent());
@@ -58,6 +58,9 @@ public class FeatureFlagService {
         flag.setDescription(description);
         flag.setEnabled(enabled);
         flag.setUpdatedAt(LocalDateTime.now());
+        // ----- FIX: Set tenant ID -----
+        Long tenantId = TenantContext.getTenantId();
+        flag.setTenantId(tenantId != null ? tenantId : 1L);
         return repository.save(flag);
     }
 

@@ -3,6 +3,7 @@ package com.enterprise.api;
 import com.enterprise.invoice.ApprovalRule;
 import com.enterprise.invoice.ApprovalRuleRepository;
 import com.enterprise.invoice.InvoiceService;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -73,6 +74,9 @@ public class AdminApprovalController {
             autoRule.setRequiresApproval(false);
             autoRule.setDescription("Amount £" + threshold + " or less – auto-approved");
             autoRule.setActive(true);
+            // ----- FIX: Set tenant ID -----
+            Long tenantId = TenantContext.getTenantId();
+            autoRule.setTenantId(tenantId != null ? tenantId : 1L);
             ruleRepository.save(autoRule);
 
             ApprovalRule requireRule = new ApprovalRule();
@@ -81,11 +85,11 @@ public class AdminApprovalController {
             requireRule.setRequiresApproval(true);
             requireRule.setDescription("Amount over £" + threshold + " – requires approval");
             requireRule.setActive(true);
+            // ----- FIX: Set tenant ID -----
+            requireRule.setTenantId(tenantId != null ? tenantId : 1L);
             ruleRepository.save(requireRule);
 
-            // Re‑evaluate ALL non‑paid invoices
             invoiceService.reEvaluateAllInvoices();
-
             redirectAttributes.addFlashAttribute("success", "Threshold updated and all invoices re-evaluated.");
         } catch (Exception e) {
             log.error("Error saving threshold", e);
@@ -104,6 +108,9 @@ public class AdminApprovalController {
     public String createRule(@ModelAttribute ApprovalRule rule,
                              RedirectAttributes redirectAttributes) {
         try {
+            // ----- FIX: Set tenant ID -----
+            Long tenantId = TenantContext.getTenantId();
+            rule.setTenantId(tenantId != null ? tenantId : 1L);
             ruleRepository.save(rule);
             invoiceService.reEvaluateAllInvoices();
             redirectAttributes.addFlashAttribute("success", "Rule created and all invoices re-evaluated.");
@@ -160,9 +167,7 @@ public class AdminApprovalController {
                     .orElseThrow(() -> new RuntimeException("Rule not found"));
             rule.setActive(!rule.isActive());
             ruleRepository.save(rule);
-
             invoiceService.reEvaluateAllInvoices();
-
             redirectAttributes.addFlashAttribute("success",
                     rule.isActive() ? "Rule activated and all invoices re-evaluated." : "Rule deactivated and all invoices re-evaluated.");
         } catch (Exception e) {

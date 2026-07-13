@@ -1,1 +1,0 @@
-ALTER TABLE dlq_entry ALTER COLUMN payload TYPE TEXT;

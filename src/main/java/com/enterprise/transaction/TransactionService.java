@@ -5,6 +5,7 @@ import com.enterprise.events.TransactionSettledEvent;
 import com.enterprise.ledger.LedgerService;
 import com.enterprise.notification.NotificationService;
 import com.enterprise.reliability.Reliable;
+import com.enterprise.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +81,11 @@ public class TransactionService {
             request.getAmount(),
             idempotencyKey
         );
+
+        // ----- FIX: Set tenant ID -----
+        Long tenantId = TenantContext.getTenantId();
+        transaction.setTenantId(tenantId != null ? tenantId : 1L);
+
         transaction = transactionRepository.save(transaction);
 
         // 4. Authorise
@@ -94,12 +100,32 @@ public class TransactionService {
         ledgerService.recordDebit(request.getCustomerId(), request.getAmount(), transaction.getId());
         ledgerService.recordCredit(request.getMerchantId(), request.getAmount(), transaction.getId());
 
-        // 7. Audit with diff snapshots (before = null fields, after = actual transaction)
-        Map<String, Object> afterMap = objectMapper.convertValue(transaction, Map.class);
+        // ================================================================
+        // 7. Audit with diff snapshots – Manual maps, no Hibernate proxies
+        // ================================================================
         Map<String, Object> beforeMap = new HashMap<>();
-        for (String key : afterMap.keySet()) {
-            beforeMap.put(key, null);
-        }
+        beforeMap.put("id", null);
+        beforeMap.put("invoiceId", null);
+        beforeMap.put("customerId", null);
+        beforeMap.put("merchantId", null);
+        beforeMap.put("amount", null);
+        beforeMap.put("currency", null);
+        beforeMap.put("status", null);
+        beforeMap.put("idempotencyKey", null);
+        beforeMap.put("createdAt", null);
+        beforeMap.put("updatedAt", null);
+
+        Map<String, Object> afterMap = new HashMap<>();
+        afterMap.put("id", transaction.getId());
+        afterMap.put("invoiceId", transaction.getInvoiceId());
+        afterMap.put("customerId", transaction.getCustomerId());
+        afterMap.put("merchantId", transaction.getMerchantId());
+        afterMap.put("amount", transaction.getAmount());
+        afterMap.put("currency", transaction.getCurrency());
+        afterMap.put("status", transaction.getStatus().name());
+        afterMap.put("idempotencyKey", transaction.getIdempotencyKey());
+        afterMap.put("createdAt", transaction.getCreatedAt());
+        afterMap.put("updatedAt", transaction.getUpdatedAt());
 
         auditService.recordEvent(
             "PAYMENT_SETTLED",
