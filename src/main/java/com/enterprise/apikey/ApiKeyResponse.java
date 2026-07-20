@@ -14,6 +14,8 @@ public class ApiKeyResponse {
 
     public ApiKeyResponse(ApiKey apiKey) {
         this.id = apiKey.getId();
+        // keyValue should be the FULL key when generated
+        // For existing keys, it's the prefix
         this.keyValue = apiKey.getKeyValue();
         this.name = apiKey.getName();
         this.userId = apiKey.getUser().getId();
@@ -23,7 +25,7 @@ public class ApiKeyResponse {
         this.createdAt = apiKey.getCreatedAt();
     }
 
-    // Getters and setters
+    // Getters and setters...
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getKeyValue() { return keyValue; }

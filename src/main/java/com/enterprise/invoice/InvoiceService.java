@@ -50,15 +50,31 @@ public class InvoiceService {
         this.objectMapper = objectMapper;
     }
 
+    // ===== CREATE INVOICE =====
     @Transactional
     public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
                                  Long merchantId, boolean requiresApproval, String currency) {
+        log.info("📝 Creating invoice for merchant {}: amount {}, description '{}', customer {}",
+                merchantId, amount, description, customerEmail);
+
+        AppUser merchant = userRepository.findById(merchantId)
+                .orElseThrow(() -> {
+                    log.error("❌ Merchant not found with id: {}", merchantId);
+                    return new RuntimeException("Merchant not found");
+                });
+        if (!merchant.isActive()) {
+            log.error("❌ Merchant account is disabled: {}", merchantId);
+            throw new RuntimeException("Merchant account is disabled");
+        }
+        Long tenantId = merchant.getTenantId();
+        if (tenantId == null) {
+            log.warn("⚠️ Merchant {} has null tenantId, falling back to default tenant 1", merchantId);
+            tenantId = 1L;
+        }
+
         Invoice invoice = new Invoice(amount, description, customerEmail, merchantId);
         invoice.setCurrency(currency != null && !currency.isEmpty() ? currency : "GBP");
-
-        // ----- FIX: Set tenant ID -----
-        Long tenantId = TenantContext.getTenantId();
-        invoice.setTenantId(tenantId != null ? tenantId : 1L);
+        invoice.setTenantId(tenantId);
 
         SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
         invoice.setRiskLevel(result.getRiskLevel());
@@ -73,7 +89,7 @@ public class InvoiceService {
 
         invoice = invoiceRepository.save(invoice);
 
-        // ===== AUDIT WITH DIFF SNAPSHOTS =====
+        // Audit
         Map<String, Object> afterMap = objectMapper.convertValue(invoice, Map.class);
         Map<String, Object> beforeMap = new HashMap<>();
         for (String key : afterMap.keySet()) {
@@ -81,22 +97,22 @@ public class InvoiceService {
         }
 
         auditService.recordEvent(
-            "INVOICE_CREATED",
-            merchantId,
-            Map.of("invoiceId", invoice.getId(), "amount", amount, "customer", customerEmail),
-            "Invoice",
-            invoice.getId(),
-            beforeMap,
-            afterMap
+                "INVOICE_CREATED",
+                merchantId,
+                Map.of("invoiceId", invoice.getId(), "amount", amount, "customer", customerEmail),
+                "Invoice",
+                invoice.getId(),
+                beforeMap,
+                afterMap
         );
 
         // Notify merchant
         notificationService.createNotification(
-            merchantId,
-            "INVOICE_CREATED",
-            "Invoice Created",
-            String.format("Invoice #%d created for %.2f %s to %s", invoice.getId(), amount, invoice.getCurrency(), customerEmail),
-            "/invoices/" + invoice.getId()
+                merchantId,
+                "INVOICE_CREATED",
+                "Invoice Created",
+                String.format("Invoice #%d created for %.2f %s to %s", invoice.getId(), amount, invoice.getCurrency(), customerEmail),
+                "/invoices/" + invoice.getId()
         );
 
         if (needsApproval) {
@@ -108,129 +124,183 @@ public class InvoiceService {
             };
             for (AppUser admin : admins) {
                 notificationService.createNotification(
-                    admin.getId(),
-                    "INVOICE_PENDING_APPROVAL",
-                    "Invoice Requires Approval",
-                    String.format("%s Invoice #%d for %.2f %s is pending approval (Risk: %s, Reason: %s)",
-                                  riskIcon, invoice.getId(), amount, invoice.getCurrency(),
-                                  result.getRiskLevel(), result.getReason()),
-                    "/admin/invoices/pending"
+                        admin.getId(),
+                        "INVOICE_PENDING_APPROVAL",
+                        "Invoice Requires Approval",
+                        String.format("%s Invoice #%d for %.2f %s is pending approval (Risk: %s, Reason: %s)",
+                                riskIcon, invoice.getId(), amount, invoice.getCurrency(),
+                                result.getRiskLevel(), result.getReason()),
+                        "/admin/invoices/pending"
                 );
             }
         } else {
             Long customerId = getUserIdByEmail(customerEmail);
             if (customerId != null) {
                 notificationService.createNotification(
-                    customerId,
-                    "INVOICE_READY",
-                    "Invoice Ready for Payment",
-                    String.format("Invoice #%d for %.2f %s is ready to pay", invoice.getId(), amount, invoice.getCurrency()),
-                    "/invoices/" + invoice.getId()
+                        customerId,
+                        "INVOICE_READY",
+                        "Invoice Ready for Payment",
+                        String.format("Invoice #%d for %.2f %s is ready to pay", invoice.getId(), amount, invoice.getCurrency()),
+                        "/invoices/" + invoice.getId()
                 );
             }
         }
 
+        log.info("✅ Invoice {} created successfully", invoice.getId());
         return invoice;
     }
 
+    // ===== SINGLE APPROVE =====
     @Transactional
     public Invoice approveInvoice(Long invoiceId, Long adminId) {
+        log.info("🔵 InvoiceService.approveInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
+
         Invoice beforeEntity = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                .orElseThrow(() -> {
+                    log.error("❌ Invoice not found: {}", invoiceId);
+                    return new RuntimeException("Invoice not found");
+                });
         Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
 
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
         if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
+            log.warn("⚠️ Invoice {} is not pending approval (status: {})", invoiceId, invoice.getStatus());
             throw new IllegalStateException("Invoice is not pending approval");
         }
+
+        log.info("   Approving invoice {}", invoiceId);
         invoice.setStatus("APPROVED");
         invoice.setUpdatedAt(LocalDateTime.now());
         Invoice afterEntity = invoiceRepository.save(invoice);
         Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
 
         auditService.recordEvent(
-            "INVOICE_APPROVED",
-            adminId,
-            Map.of("invoiceId", invoiceId),
-            "Invoice",
-            invoiceId,
-            before,
-            after
+                "INVOICE_APPROVED",
+                adminId,
+                Map.of("invoiceId", invoiceId),
+                "Invoice",
+                invoiceId,
+                before,
+                after
         );
 
         notificationService.createNotification(
-            invoice.getMerchantId(),
-            "INVOICE_APPROVED",
-            "Invoice Approved",
-            String.format("Invoice #%d approved by Admin", invoiceId),
-            "/invoices/" + invoiceId
+                invoice.getMerchantId(),
+                "INVOICE_APPROVED",
+                "Invoice Approved",
+                String.format("Invoice #%d approved by Admin", invoiceId),
+                "/invoices/" + invoiceId
         );
-
         Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
         if (customerId != null) {
             notificationService.createNotification(
-                customerId,
-                "INVOICE_APPROVED",
-                "Invoice Approved",
-                String.format("Invoice #%d has been approved and is ready for payment", invoiceId),
-                "/invoices/" + invoiceId
+                    customerId,
+                    "INVOICE_APPROVED",
+                    "Invoice Approved",
+                    String.format("Invoice #%d has been approved and is ready for payment", invoiceId),
+                    "/invoices/" + invoiceId
             );
         }
 
+        log.info("✅ Invoice {} approved successfully", invoiceId);
         return afterEntity;
     }
 
+    // ===== SINGLE REJECT =====
     @Transactional
     public Invoice rejectInvoice(Long invoiceId, Long adminId) {
+        log.info("🔴 InvoiceService.rejectInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
+
         Invoice beforeEntity = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
         Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
 
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
         if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
+            log.warn("⚠️ Invoice {} is not pending approval (status: {})", invoiceId, invoice.getStatus());
             throw new IllegalStateException("Invoice is not pending approval");
         }
+
+        log.info("   Rejecting invoice {}", invoiceId);
         invoice.setStatus("REJECTED");
         invoice.setUpdatedAt(LocalDateTime.now());
         Invoice afterEntity = invoiceRepository.save(invoice);
         Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
 
         auditService.recordEvent(
-            "INVOICE_REJECTED",
-            adminId,
-            Map.of("invoiceId", invoiceId),
-            "Invoice",
-            invoiceId,
-            before,
-            after
+                "INVOICE_REJECTED",
+                adminId,
+                Map.of("invoiceId", invoiceId),
+                "Invoice",
+                invoiceId,
+                before,
+                after
         );
 
         notificationService.createNotification(
-            invoice.getMerchantId(),
-            "INVOICE_REJECTED",
-            "Invoice Rejected",
-            String.format("Invoice #%d was rejected by Admin", invoiceId),
-            "/invoices/" + invoiceId
+                invoice.getMerchantId(),
+                "INVOICE_REJECTED",
+                "Invoice Rejected",
+                String.format("Invoice #%d was rejected by Admin", invoiceId),
+                "/invoices/" + invoiceId
         );
-
         Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
         if (customerId != null) {
             notificationService.createNotification(
-                customerId,
-                "INVOICE_REJECTED",
-                "Invoice Rejected",
-                String.format("Invoice #%d was rejected", invoiceId),
-                "/invoices/" + invoiceId
+                    customerId,
+                    "INVOICE_REJECTED",
+                    "Invoice Rejected",
+                    String.format("Invoice #%d was rejected", invoiceId),
+                    "/invoices/" + invoiceId
             );
         }
 
+        log.info("✅ Invoice {} rejected successfully", invoiceId);
         return afterEntity;
     }
 
+    // ===== BULK APPROVE =====
+    public int bulkApproveInvoices(List<Long> invoiceIds, Long adminId) {
+        log.info("🟢 bulkApproveInvoices() called with {} invoices by admin {}", invoiceIds.size(), adminId);
+        int approvedCount = 0;
+        for (Long id : invoiceIds) {
+            try {
+                log.info("   Approving invoice {} via bulk", id);
+                approveInvoice(id, adminId);
+                approvedCount++;
+            } catch (Exception e) {
+                log.error("❌ Failed to approve invoice {}: {}", id, e.getMessage());
+            }
+        }
+        log.info("✅ Bulk approve completed: {} out of {} approved", approvedCount, invoiceIds.size());
+        return approvedCount;
+    }
+
+    // ===== BULK REJECT =====
+    public int bulkRejectInvoices(List<Long> invoiceIds, Long adminId) {
+        log.info("🔴 bulkRejectInvoices() called with {} invoices by admin {}", invoiceIds.size(), adminId);
+        int rejectedCount = 0;
+        for (Long id : invoiceIds) {
+            try {
+                log.info("   Rejecting invoice {} via bulk", id);
+                rejectInvoice(id, adminId);
+                rejectedCount++;
+            } catch (Exception e) {
+                log.error("❌ Failed to reject invoice {}: {}", id, e.getMessage());
+            }
+        }
+        log.info("✅ Bulk reject completed: {} out of {} rejected", rejectedCount, invoiceIds.size());
+        return rejectedCount;
+    }
+
+    // ===== MARK AS PAID =====
     @Transactional
     public void markAsPaid(Long invoiceId, Long transactionId) {
+        log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
         Invoice beforeEntity = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
         Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
@@ -238,6 +308,7 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
         if (!"APPROVED".equals(invoice.getStatus())) {
+            log.warn("⚠️ Invoice {} is not approved (status: {})", invoiceId, invoice.getStatus());
             throw new IllegalStateException("Invoice is not approved");
         }
         invoice.setStatus("PAID");
@@ -246,43 +317,44 @@ public class InvoiceService {
         Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
 
         auditService.recordEvent(
-            "INVOICE_PAID",
-            invoice.getMerchantId(),
-            Map.of("invoiceId", invoiceId, "transactionId", transactionId),
-            "Invoice",
-            invoiceId,
-            before,
-            after
+                "INVOICE_PAID",
+                invoice.getMerchantId(),
+                Map.of("invoiceId", invoiceId, "transactionId", transactionId),
+                "Invoice",
+                invoiceId,
+                before,
+                after
         );
 
         notificationService.createNotification(
-            invoice.getMerchantId(),
-            "INVOICE_PAID",
-            "Invoice Paid",
-            String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
-            "/transactions/" + transactionId
+                invoice.getMerchantId(),
+                "INVOICE_PAID",
+                "Invoice Paid",
+                String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
+                "/transactions/" + transactionId
         );
-
         Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
         if (customerId != null) {
             notificationService.createNotification(
-                customerId,
-                "INVOICE_PAID",
-                "Invoice Paid",
-                String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
-                "/transactions/" + transactionId
+                    customerId,
+                    "INVOICE_PAID",
+                    "Invoice Paid",
+                    String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
+                    "/transactions/" + transactionId
             );
         }
     }
 
+    // ===== RE-EVALUATION METHODS =====
     @Transactional
     public void reEvaluateAllInvoices() {
+        log.info("🔄 Re-evaluating all non-paid invoices for approval rules");
         List<Invoice> invoices = invoiceRepository.findByStatusIn(List.of("APPROVED", "PENDING_APPROVAL"));
+        int updated = 0;
         for (Invoice invoice : invoices) {
             if ("PAID".equals(invoice.getStatus()) || "REJECTED".equals(invoice.getStatus())) {
                 continue;
             }
-
             String risk = Objects.requireNonNullElse(invoice.getRiskLevel(), "GREEN");
             boolean isSuspicious = !"GREEN".equals(risk);
 
@@ -295,34 +367,42 @@ public class InvoiceService {
 
             invoice.setRequiresApproval(needsApproval);
             String newStatus = needsApproval ? "PENDING_APPROVAL" : "APPROVED";
-
             if (!newStatus.equals(invoice.getStatus())) {
                 invoice.setStatus(newStatus);
                 invoice.setUpdatedAt(LocalDateTime.now());
-                if (needsApproval) {
-                    notificationService.createNotification(
-                        invoice.getMerchantId(),
-                        "INVOICE_MOVED_TO_PENDING",
-                        "Invoice Moved to Pending",
-                        "Invoice #" + invoice.getId() + " now requires approval after rule update.",
-                        "/invoices/" + invoice.getId()
-                    );
-                } else {
-                    notificationService.createNotification(
-                        invoice.getMerchantId(),
-                        "INVOICE_AUTO_APPROVED",
-                        "Invoice Auto-Approved",
-                        "Invoice #" + invoice.getId() + " was automatically approved after rule update.",
-                        "/invoices/" + invoice.getId()
-                    );
+                updated++;
+                try {
+                    if (needsApproval) {
+                        notificationService.createNotification(
+                                invoice.getMerchantId(),
+                                "INVOICE_MOVED_TO_PENDING",
+                                "Invoice Moved to Pending",
+                                "Invoice #" + invoice.getId() + " now requires approval after rule update.",
+                                "/invoices/" + invoice.getId()
+                        );
+                    } else {
+                        notificationService.createNotification(
+                                invoice.getMerchantId(),
+                                "INVOICE_AUTO_APPROVED",
+                                "Invoice Auto-Approved",
+                                "Invoice #" + invoice.getId() + " was automatically approved after rule update.",
+                                "/invoices/" + invoice.getId()
+                        );
+                    }
+                } catch (Exception e) {
+                    log.warn("⚠️ Notification failed during re-evaluation for invoice {}: {}", invoice.getId(), e.getMessage());
                 }
             }
         }
-        invoiceRepository.saveAll(invoices);
+        if (updated > 0) {
+            invoiceRepository.saveAll(invoices);
+        }
+        log.info("✅ Re-evaluation completed: {} invoices updated", updated);
     }
 
     @Transactional
     public void reEvaluateAllInvoicesForSuspicion() {
+        log.info("🔄 Re-evaluating all invoices for suspicion");
         List<Invoice> allInvoices = invoiceRepository.findAll();
         int updated = 0;
         for (Invoice invoice : allInvoices) {
@@ -339,16 +419,17 @@ public class InvoiceService {
                 updated++;
             }
         }
-        log.info("Re-evaluated {} invoices for suspicion; {} risk levels changed", allInvoices.size(), updated);
+        log.info("✅ Re-evaluation for suspicion completed: {} invoices risk levels changed", updated);
     }
 
     @EventListener
     @Transactional
     public void onSuspicionEnabled(SuspicionEnabledEvent event) {
-        log.info("Received SuspicionEnabledEvent – re-evaluating all invoices for suspicion");
+        log.info("📢 Received SuspicionEnabledEvent – re-evaluating all invoices for suspicion");
         reEvaluateAllInvoicesForSuspicion();
     }
 
+    // ===== HELPERS =====
     private Long getUserIdByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(AppUser::getId)

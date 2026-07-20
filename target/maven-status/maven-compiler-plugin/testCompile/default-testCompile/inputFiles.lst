@@ -1,0 +1,10 @@
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/api/v1/ApiContractTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/identity/AuthenticationIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/BaseIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/DlqSchedulerIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/MultiTenantIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/PaymentIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/PaymentInvariantTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/RefundIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/transaction/TransactionIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/util/TestDataBuilder.java

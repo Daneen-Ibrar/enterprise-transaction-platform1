@@ -46,7 +46,6 @@ public class AdminRefundController {
             List<Transaction> settled = transactionRepository.findByStatus(TransactionStatus.SETTLED);
             log.info("Found {} settled transactions", settled.size());
 
-            // Build a map of transaction ID → refundable (true/false)
             Map<Long, Boolean> refundableMap = new HashMap<>();
             for (Transaction tx : settled) {
                 RefundService.RefundEligibility eligibility = refundService.evaluate(tx);
@@ -84,7 +83,7 @@ public class AdminRefundController {
         }
     }
 
-    // ----- Process refund -----
+    // ----- Process single refund -----
     @PostMapping("/{transactionId}")
     public String processRefund(@PathVariable Long transactionId,
                                 @RequestParam String reason,
@@ -101,6 +100,27 @@ public class AdminRefundController {
         } catch (Exception e) {
             log.error("ERROR in processRefund for transaction {}: {}", transactionId, e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Refund failed: " + e.getMessage());
+            return "redirect:/admin/refunds";
+        }
+    }
+
+    // ----- BULK REFUND -----
+    @PostMapping("/bulk")
+    public String bulkRefund(@RequestParam List<Long> ids,
+                             @RequestParam String reason,
+                             Authentication authentication,
+                             RedirectAttributes redirectAttributes) {
+        log.info("=== AdminRefundController.bulkRefund() called for {} transactions", ids.size());
+        try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+            int count = refundService.bulkRefundTransactions(ids, admin.getId(), reason);
+            log.info("Bulk refund completed: {} of {} successful", count, ids.size());
+            redirectAttributes.addFlashAttribute("success", "Bulk refunded " + count + " transactions.");
+            return "redirect:/admin/refunds";
+        } catch (Exception e) {
+            log.error("ERROR in bulkRefund: {}", e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("error", "Bulk refund failed: " + e.getMessage());
             return "redirect:/admin/refunds";
         }
     }

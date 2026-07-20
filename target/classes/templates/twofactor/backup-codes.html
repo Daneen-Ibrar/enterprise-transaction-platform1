@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Backup Codes</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .backup-codes { background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 15px 0; font-family: monospace; }
+        .backup-codes code { display: block; padding: 4px 0; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-success { background: #2d7a3a; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .warning { background: #fff3cd; padding: 10px; border: 1px solid #ffc107; margin: 10px 0; }
+        .success { color: green; padding: 10px; border: 1px solid green; background: #eeffee; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔑 Backup Codes</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+    <a href="/2fa/setup">← Back to 2FA Setup</a>
+
+    <div th:if="${!hasCodes}" class="warning">
+        <p>You have no unused backup codes. Generate new ones below.</p>
+    </div>
+
+    <div th:if="${hasCodes}">
+        <div class="success">
+            <p>✅ You have <strong><span th:text="${remainingCount}">10</span></strong> unused backup codes.</p>
+        </div>
+        <p><strong>Note:</strong> Backup codes can only be viewed once. Make sure to save them securely.</p>
+        <p>Each code can only be used once.</p>
+    </div>
+
+    <form method="post" th:action="@{/2fa/backup-codes/regenerate}">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to regenerate backup codes? Old codes will be invalidated.');">
+            Regenerate Backup Codes
+        </button>
+    </form>
+
+    <div style="margin-top: 20px;">
+        <a href="/2fa/setup" class="btn btn-primary">Back to 2FA Setup</a>
+    </div>
+</body>
+</html>

@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -21,7 +20,6 @@ public class ReportingService {
         this.transactionRepository = transactionRepository;
     }
 
-    // ----- Core data filtering -----
     public List<Transaction> getTransactionsBetween(LocalDate startDate, LocalDate endDate) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
@@ -30,7 +28,6 @@ public class ReportingService {
                 .collect(Collectors.toList());
     }
 
-    // ----- Volume per day -----
     public Map<LocalDate, Long> getDailyVolume(LocalDate startDate, LocalDate endDate) {
         List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
         return transactions.stream()
@@ -40,7 +37,6 @@ public class ReportingService {
                 ));
     }
 
-    // ----- Average amount per day -----
     public Map<LocalDate, BigDecimal> getDailyAverage(LocalDate startDate, LocalDate endDate) {
         List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
         return transactions.stream()
@@ -55,7 +51,6 @@ public class ReportingService {
                 ));
     }
 
-    // ----- Summary metrics -----
     public Map<String, Object> getSummaryMetrics(LocalDate startDate, LocalDate endDate) {
         List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
         long total = transactions.size();
@@ -92,7 +87,6 @@ public class ReportingService {
         );
     }
 
-    // ----- Status distribution -----
     public Map<String, Long> getStatusDistribution(LocalDate startDate, LocalDate endDate) {
         List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
         return transactions.stream()
@@ -102,7 +96,6 @@ public class ReportingService {
                 ));
     }
 
-    // ----- Top merchants by volume -----
     public List<Map<String, Object>> getTopMerchants(LocalDate startDate, LocalDate endDate, int limit) {
         List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
         return transactions.stream()
@@ -120,5 +113,22 @@ public class ReportingService {
                     return map;
                 })
                 .collect(Collectors.toList());
+    }
+
+    // ----- NEW: Daily Success Rate -----
+    public Map<LocalDate, Double> getDailySuccessRate(LocalDate startDate, LocalDate endDate) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
+        Map<LocalDate, List<Transaction>> byDay = transactions.stream()
+                .collect(Collectors.groupingBy(tx -> tx.getCreatedAt().toLocalDate()));
+        Map<LocalDate, Double> result = new LinkedHashMap<>();
+        for (Map.Entry<LocalDate, List<Transaction>> entry : byDay.entrySet()) {
+            long total = entry.getValue().size();
+            long settled = entry.getValue().stream()
+                    .filter(tx -> "SETTLED".equals(tx.getStatus().name()))
+                    .count();
+            double rate = total == 0 ? 0 : (double) settled / total * 100;
+            result.put(entry.getKey(), rate);
+        }
+        return result;
     }
 }

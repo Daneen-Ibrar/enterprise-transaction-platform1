@@ -1,5 +1,7 @@
 package com.enterprise.identity;
 
+import com.enterprise.tenant.TenantContext;
+import com.enterprise.tenant.TenantRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,20 +13,30 @@ public class TestUserInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantRepository tenantRepository;
 
-    public TestUserInitializer(UserRepository userRepository, RoleRepository roleRepository,
-                               PasswordEncoder passwordEncoder) {
+    public TestUserInitializer(UserRepository userRepository,
+                               RoleRepository roleRepository,
+                               PasswordEncoder passwordEncoder,
+                               TenantRepository tenantRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tenantRepository = tenantRepository;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        createTestUser("TEST_CUSTOMER_EMAIL", "TEST_CUSTOMER_PASSWORD", "CUSTOMER");
-        createTestUser("TEST_MERCHANT_EMAIL", "TEST_MERCHANT_PASSWORD", "MERCHANT");
-        createTestUser("TEST_ADMIN_EMAIL", "TEST_ADMIN_PASSWORD", "ADMIN");
-        createTestUser("TEST_AUDITOR_EMAIL", "TEST_AUDITOR_PASSWORD", "AUDITOR");
+        // Set a default tenant for system initialization
+        TenantContext.setTenantId(1L);
+        try {
+            createTestUser("TEST_CUSTOMER_EMAIL", "TEST_CUSTOMER_PASSWORD", "CUSTOMER");
+            createTestUser("TEST_MERCHANT_EMAIL", "TEST_MERCHANT_PASSWORD", "MERCHANT");
+            createTestUser("TEST_ADMIN_EMAIL", "TEST_ADMIN_PASSWORD", "ADMIN");
+            createTestUser("TEST_AUDITOR_EMAIL", "TEST_AUDITOR_PASSWORD", "AUDITOR");
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     private void createTestUser(String emailEnv, String passwordEnv, String roleName) {
@@ -39,9 +51,12 @@ public class TestUserInitializer implements ApplicationRunner {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.getRoles().add(role);
-        // --- FIX: Set tenant ID to default tenant (1) ---
         user.setTenantId(1L);
         user.setActive(true);
+        // Mark admin@test.com as super admin
+        if ("ADMIN".equals(roleName) && "admin@test.com".equals(email)) {
+            user.setSuperAdmin(true);
+        }
         userRepository.save(user);
     }
 }

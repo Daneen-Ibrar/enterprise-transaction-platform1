@@ -3,6 +3,7 @@ package com.enterprise.api;
 import com.enterprise.reporting.ReportingService;
 import com.enterprise.reporting.PdfExportService;
 import com.enterprise.reporting.ExcelExportService;
+import com.enterprise.transaction.Transaction;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -13,9 +14,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.ByteArrayOutputStream;
-import java.math.BigDecimal;   // <-- ADD THIS IMPORT
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -57,18 +59,30 @@ public class ReportingController {
         var summary = reportingService.getSummaryMetrics(startDate, endDate);
         var statusDist = reportingService.getStatusDistribution(startDate, endDate);
         var topMerchants = reportingService.getTopMerchants(startDate, endDate, 5);
+        var successRate = reportingService.getDailySuccessRate(startDate, endDate);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         List<String> labels = volume.keySet().stream().sorted().map(d -> d.format(formatter)).collect(Collectors.toList());
         List<Long> volumeData = labels.stream().map(label -> volume.getOrDefault(LocalDate.parse(label, formatter), 0L)).collect(Collectors.toList());
-
-        // avgData: convert BigDecimal to Double
         List<Double> avgData = labels.stream()
                 .map(label -> avgAmount.getOrDefault(LocalDate.parse(label, formatter), BigDecimal.ZERO).doubleValue())
                 .collect(Collectors.toList());
 
         List<String> statusLabels = new ArrayList<>(statusDist.keySet());
         List<Long> statusValues = statusLabels.stream().map(statusDist::get).collect(Collectors.toList());
+
+        // Top merchants for bar chart
+        List<String> merchantLabels = topMerchants.stream()
+                .map(m -> "Merchant " + m.get("merchantId"))
+                .collect(Collectors.toList());
+        List<Double> merchantValues = topMerchants.stream()
+                .map(m -> ((BigDecimal) m.get("totalAmount")).doubleValue())
+                .collect(Collectors.toList());
+
+        // Daily success rate values
+        List<Double> successRateValues = labels.stream()
+                .map(label -> successRate.getOrDefault(LocalDate.parse(label, formatter), 0.0))
+                .collect(Collectors.toList());
 
         model.addAttribute("labels", labels);
         model.addAttribute("volumeData", volumeData);
@@ -77,12 +91,51 @@ public class ReportingController {
         model.addAttribute("statusLabels", statusLabels);
         model.addAttribute("statusValues", statusValues);
         model.addAttribute("topMerchants", topMerchants);
+        model.addAttribute("merchantLabels", merchantLabels);
+        model.addAttribute("merchantValues", merchantValues);
+        model.addAttribute("successRateData", successRateValues);
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
 
         return "admin/reports/dashboard";
     }
 
+    // ===== CSV EXPORT =====
+    @GetMapping("/data/transactions/csv")
+    @ResponseBody
+    public ResponseEntity<String> exportCsv(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        if (startDate == null) startDate = LocalDate.now().minusDays(30);
+        if (endDate == null) endDate = LocalDate.now();
+        if (startDate.isAfter(endDate)) {
+            LocalDate temp = startDate;
+            startDate = endDate;
+            endDate = temp;
+        }
+
+        List<Transaction> transactions = reportingService.getTransactionsBetween(startDate, endDate);
+        StringBuilder csv = new StringBuilder();
+        csv.append("ID,Invoice,Customer,Merchant,Amount,Currency,Status,Created\n");
+        for (Transaction tx : transactions) {
+            csv.append(tx.getId()).append(",")
+               .append(tx.getInvoiceId()).append(",")
+               .append(tx.getCustomerId()).append(",")
+               .append(tx.getMerchantId()).append(",")
+               .append(tx.getAmount()).append(",")
+               .append(tx.getCurrency()).append(",")
+               .append(tx.getStatus().name()).append(",")
+               .append(tx.getCreatedAt()).append("\n");
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=transactions_" + startDate + "_to_" + endDate + ".csv")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(csv.toString());
+    }
+
+    // ===== PDF EXPORT =====
     @GetMapping("/export/pdf")
     public ResponseEntity<byte[]> exportPdf(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -103,6 +156,7 @@ public class ReportingController {
                 .body(pdfStream.toByteArray());
     }
 
+    // ===== EXCEL EXPORT =====
     @GetMapping("/export/excel")
     public ResponseEntity<byte[]> exportExcel(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,

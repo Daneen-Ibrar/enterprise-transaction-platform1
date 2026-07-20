@@ -50,7 +50,12 @@ public class Invoice {
     // ----- TENANT ID -----
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
+@Version
+@Column(name = "version", nullable = false)
+private Long version = 0L;
 
+public Long getVersion() { return version; }
+public void setVersion(Long version) { this.version = version; }
     // Constructors
     public Invoice() {}
 

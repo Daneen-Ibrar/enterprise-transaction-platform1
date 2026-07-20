@@ -1,19 +1,33 @@
 package com.enterprise.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.enterprise.audit.RuleAuditService;
+import com.enterprise.identity.AppUser;
+import com.enterprise.identity.UserRepository;
 import com.enterprise.invoice.ApprovalRule;
 import com.enterprise.invoice.ApprovalRuleRepository;
 import com.enterprise.invoice.InvoiceService;
 import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/approval-rules")
@@ -23,19 +37,25 @@ public class AdminApprovalController {
     private static final Logger log = LoggerFactory.getLogger(AdminApprovalController.class);
     private final ApprovalRuleRepository ruleRepository;
     private final InvoiceService invoiceService;
+    private final RuleAuditService ruleAuditService;
+    private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     public AdminApprovalController(ApprovalRuleRepository ruleRepository,
-                                   InvoiceService invoiceService) {
+                                   InvoiceService invoiceService,
+                                   RuleAuditService ruleAuditService,
+                                   UserRepository userRepository,
+                                   ObjectMapper objectMapper) {
         this.ruleRepository = ruleRepository;
         this.invoiceService = invoiceService;
+        this.ruleAuditService = ruleAuditService;
+        this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping
     public String index(@RequestParam(required = false) String search, Model model) {
-        log.info("=== Loading approval rules page ===");
         List<ApprovalRule> rules = ruleRepository.findAll();
-        log.info("Found {} rules", rules.size());
-
         if (search != null && !search.isEmpty()) {
             String lowerSearch = search.toLowerCase();
             rules = rules.stream()
@@ -64,8 +84,12 @@ public class AdminApprovalController {
 
     @PostMapping("/settings")
     public String saveSettings(@RequestParam BigDecimal threshold,
+                               Authentication authentication,
                                RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
             ruleRepository.deleteAll();
 
             ApprovalRule autoRule = new ApprovalRule();
@@ -74,10 +98,9 @@ public class AdminApprovalController {
             autoRule.setRequiresApproval(false);
             autoRule.setDescription("Amount £" + threshold + " or less – auto-approved");
             autoRule.setActive(true);
-            // ----- FIX: Set tenant ID -----
-            Long tenantId = TenantContext.getTenantId();
-            autoRule.setTenantId(tenantId != null ? tenantId : 1L);
-            ruleRepository.save(autoRule);
+            autoRule.setTenantId(TenantContext.getTenantId() != null ? TenantContext.getTenantId() : 1L);
+            autoRule = ruleRepository.save(autoRule);
+            ruleAuditService.logChange("APPROVAL", autoRule.getId(), "CREATE", null, autoRule, admin.getId());
 
             ApprovalRule requireRule = new ApprovalRule();
             requireRule.setPriority(2);
@@ -85,9 +108,9 @@ public class AdminApprovalController {
             requireRule.setRequiresApproval(true);
             requireRule.setDescription("Amount over £" + threshold + " – requires approval");
             requireRule.setActive(true);
-            // ----- FIX: Set tenant ID -----
-            requireRule.setTenantId(tenantId != null ? tenantId : 1L);
-            ruleRepository.save(requireRule);
+            requireRule.setTenantId(TenantContext.getTenantId() != null ? TenantContext.getTenantId() : 1L);
+            requireRule = ruleRepository.save(requireRule);
+            ruleAuditService.logChange("APPROVAL", requireRule.getId(), "CREATE", null, requireRule, admin.getId());
 
             invoiceService.reEvaluateAllInvoices();
             redirectAttributes.addFlashAttribute("success", "Threshold updated and all invoices re-evaluated.");
@@ -106,12 +129,18 @@ public class AdminApprovalController {
 
     @PostMapping
     public String createRule(@ModelAttribute ApprovalRule rule,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
-            // ----- FIX: Set tenant ID -----
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
             Long tenantId = TenantContext.getTenantId();
             rule.setTenantId(tenantId != null ? tenantId : 1L);
-            ruleRepository.save(rule);
+            rule.setActive(true);
+            ApprovalRule savedRule = ruleRepository.save(rule);
+            ruleAuditService.logChange("APPROVAL", savedRule.getId(), "CREATE", null, savedRule, admin.getId());
+
             invoiceService.reEvaluateAllInvoices();
             redirectAttributes.addFlashAttribute("success", "Rule created and all invoices re-evaluated.");
         } catch (Exception e) {
@@ -132,10 +161,20 @@ public class AdminApprovalController {
     @PostMapping("/{id}")
     public String updateRule(@PathVariable Long id,
                              @ModelAttribute ApprovalRule rule,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+            ApprovalRule oldRule = ruleRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Rule not found"));
+
             rule.setId(id);
-            ruleRepository.save(rule);
+            rule.setCreatedAt(oldRule.getCreatedAt());
+            ApprovalRule savedRule = ruleRepository.save(rule);
+            ruleAuditService.logChange("APPROVAL", savedRule.getId(), "UPDATE", oldRule, savedRule, admin.getId());
+
             invoiceService.reEvaluateAllInvoices();
             redirectAttributes.addFlashAttribute("success", "Rule updated and all invoices re-evaluated.");
         } catch (Exception e) {
@@ -147,8 +186,16 @@ public class AdminApprovalController {
 
     @PostMapping("/{id}/delete")
     public String deleteRule(@PathVariable Long id,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+            ApprovalRule rule = ruleRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Rule not found"));
+            ruleAuditService.logChange("APPROVAL", id, "DELETE", rule, null, admin.getId());
+
             ruleRepository.deleteById(id);
             invoiceService.reEvaluateAllInvoices();
             redirectAttributes.addFlashAttribute("success", "Rule deleted and all invoices re-evaluated.");
@@ -161,18 +208,89 @@ public class AdminApprovalController {
 
     @PostMapping("/{id}/toggle")
     public String toggleRule(@PathVariable Long id,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
             ApprovalRule rule = ruleRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Rule not found"));
+
+            ApprovalRule oldRule = new ApprovalRule();
+            oldRule.setId(rule.getId());
+            oldRule.setPriority(rule.getPriority());
+            oldRule.setConditionExpression(rule.getConditionExpression());
+            oldRule.setRequiresApproval(rule.isRequiresApproval());
+            oldRule.setDescription(rule.getDescription());
+            oldRule.setActive(rule.isActive());
+
             rule.setActive(!rule.isActive());
-            ruleRepository.save(rule);
+            ApprovalRule savedRule = ruleRepository.save(rule);
+            ruleAuditService.logChange("APPROVAL", savedRule.getId(), "TOGGLE", oldRule, savedRule, admin.getId());
+
             invoiceService.reEvaluateAllInvoices();
             redirectAttributes.addFlashAttribute("success",
                     rule.isActive() ? "Rule activated and all invoices re-evaluated." : "Rule deactivated and all invoices re-evaluated.");
         } catch (Exception e) {
             log.error("Error toggling rule", e);
             redirectAttributes.addFlashAttribute("error", "Failed to toggle rule: " + e.getMessage());
+        }
+        return "redirect:/admin/approval-rules";
+    }
+
+    // ===== EXPORT =====
+    @GetMapping("/export")
+    @ResponseBody
+    public ResponseEntity<String> exportRules(Authentication authentication) {
+        AppUser admin = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        Long tenantId = admin.getTenantId();
+        List<ApprovalRule> rules = ruleRepository.findAll().stream()
+                .filter(r -> r.getTenantId().equals(tenantId))
+                .collect(Collectors.toList());
+        try {
+            String json = objectMapper.writeValueAsString(rules);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=approval-rules.json")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(json);
+        } catch (JsonProcessingException e) {
+            log.error("Export failed", e);
+            return ResponseEntity.internalServerError().body("Export failed");
+        }
+    }
+
+    // ===== IMPORT =====
+    @PostMapping("/import")
+    public String importRules(@RequestParam("file") MultipartFile file,
+                              Authentication authentication,
+                              RedirectAttributes redirectAttributes) {
+        AppUser admin = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        Long tenantId = admin.getTenantId();
+        try {
+            String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+            List<ApprovalRule> importedRules = objectMapper.readValue(content,
+                    new TypeReference<List<ApprovalRule>>() {});
+            // Validate and set tenant
+            for (ApprovalRule rule : importedRules) {
+                rule.setId(null); // force new IDs
+                rule.setTenantId(tenantId);
+                rule.setCreatedAt(LocalDateTime.now());
+            }
+            // Delete existing rules for this tenant
+            List<ApprovalRule> existing = ruleRepository.findAll().stream()
+                    .filter(r -> r.getTenantId().equals(tenantId))
+                    .collect(Collectors.toList());
+            ruleRepository.deleteAll(existing);
+            ruleRepository.saveAll(importedRules);
+            invoiceService.reEvaluateAllInvoices();
+            redirectAttributes.addFlashAttribute("success",
+                    "Imported " + importedRules.size() + " approval rules.");
+        } catch (Exception e) {
+            log.error("Import failed", e);
+            redirectAttributes.addFlashAttribute("error", "Import failed: " + e.getMessage());
         }
         return "redirect:/admin/approval-rules";
     }

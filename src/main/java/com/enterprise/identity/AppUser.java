@@ -47,9 +47,31 @@ public class AppUser {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    // ----- TRANSIENT FIELD FOR DISPLAY (NOT PERSISTED) -----
+    // ----- SUPER ADMIN FLAG -----
+    @Column(name = "super_admin", nullable = false)
+    private boolean superAdmin = false;
+
     @Transient
     private String tenantName;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+private int failedLoginAttempts = 0;
+
+@Column(name = "account_locked", nullable = false)
+private boolean accountLocked = false;
+
+@Column(name = "lock_expiry")
+private LocalDateTime lockExpiry;
+
+// Getters and setters
+public int getFailedLoginAttempts() { return failedLoginAttempts; }
+public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+public boolean isAccountLocked() { return accountLocked; }
+public void setAccountLocked(boolean accountLocked) { this.accountLocked = accountLocked; }
+
+public LocalDateTime getLockExpiry() { return lockExpiry; }
+public void setLockExpiry(LocalDateTime lockExpiry) { this.lockExpiry = lockExpiry; }
 
     // ----- Getters and Setters -----
     public Long getId() { return id; }
@@ -70,7 +92,8 @@ public class AppUser {
     public void setTwoFactorEnabled(boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; }
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
-
     public String getTenantName() { return tenantName; }
     public void setTenantName(String tenantName) { this.tenantName = tenantName; }
+    public boolean isSuperAdmin() { return superAdmin; }
+    public void setSuperAdmin(boolean superAdmin) { this.superAdmin = superAdmin; }
 }

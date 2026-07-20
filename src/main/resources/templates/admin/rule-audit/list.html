@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Rule Audit Trail</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-create { background: #d4edda; color: #155724; }
+        .badge-update { background: #cce5ff; color: #004085; }
+        .badge-delete { background: #f8d7da; color: #721c24; }
+        .badge-toggle { background: #fff3cd; color: #856404; }
+        .filter-bar { margin: 20px 0; }
+        .filter-bar select, .filter-bar button { padding: 5px; }
+        .btn { padding: 6px 15px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #1e5c2a; }
+        .btn-clear { background: #6c757d; }
+        .btn-clear:hover { background: #5a6268; }
+        .json-preview { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8em; color: #666; }
+        .action-badge { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>📜 Rule Audit Trail</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <!-- Filter -->
+    <div class="filter-bar">
+        <form method="get" th:action="@{/admin/rule-audit}">
+            <label>Filter by Rule Type:</label>
+            <select name="ruleType">
+                <option value="">All Types</option>
+                <option th:each="type : ${ruleTypes}"
+                        th:value="${type}"
+                        th:text="${type}"
+                        th:selected="${type == selectedRuleType}"></option>
+            </select>
+            <button type="submit" class="btn">Apply Filter</button>
+            <a th:href="@{/admin/rule-audit}" class="btn btn-clear">Clear Filter</a>
+        </form>
+    </div>
+
+    <div th:if="${audits.empty}" style="padding:20px; background:#f9f9f9; text-align:center;">
+        No rule changes have been logged yet.
+    </div>
+
+    <table th:unless="${audits.empty}">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Rule Type</th>
+                <th>Rule ID</th>
+                <th>Action</th>
+                <th>Changed By</th>
+                <th>Old Values</th>
+                <th>New Values</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="audit : ${audits}">
+                <td th:text="${audit.id}">1</td>
+                <td>
+                    <span class="badge"
+                          th:classappend="${audit.ruleType == 'APPROVAL' ? 'badge-create' : audit.ruleType == 'REFUND' ? 'badge-update' : 'badge-delete'}">
+                        <span th:text="${audit.ruleType}">APPROVAL</span>
+                    </span>
+                </td>
+                <td th:text="${audit.ruleId}">123</td>
+                <td>
+                    <span class="badge"
+                          th:classappend="${audit.action == 'CREATE' ? 'badge-create' : audit.action == 'UPDATE' ? 'badge-update' : audit.action == 'DELETE' ? 'badge-delete' : 'badge-toggle'}">
+                        <span class="action-badge" th:text="${audit.action}">CREATE</span>
+                    </span>
+                </td>
+                <td>
+                    <span th:text="${audit.changedByEmail != null ? audit.changedByEmail : audit.changedBy}">
+                        admin@test.com
+                    </span>
+                </td>
+                <td>
+                    <div class="json-preview" th:text="${audit.oldValues}" title="${audit.oldValues}">
+                        {"active":true}
+                    </div>
+                </td>
+                <td>
+                    <div class="json-preview" th:text="${audit.newValues}" title="${audit.newValues}">
+                        {"active":false}
+                    </div>
+                </td>
+                <td th:text="${audit.createdAt}">2026-07-13 12:00:00</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

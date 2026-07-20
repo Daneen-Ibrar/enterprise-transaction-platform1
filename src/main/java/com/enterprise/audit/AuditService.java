@@ -2,6 +2,7 @@ package com.enterprise.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,13 @@ public class AuditService {
             event.setEntityId(entityId);
             event.setPreviousState(previousJson);
             event.setCurrentState(currentJson);
+
+            // ----- FIX: Set tenant ID from context -----
+            Long tenantId = TenantContext.getTenantId();
+            if (tenantId == null) {
+                tenantId = 1L; // fallback to default tenant
+            }
+            event.setTenantId(tenantId);
 
             return auditRepository.save(event);
 

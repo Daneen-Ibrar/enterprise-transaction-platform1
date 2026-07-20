@@ -14,4 +14,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     // For admin rejected invoice view
     List<Invoice> findByStatus(String status);
     List<Invoice> findByStatusAndCustomerEmailContainingIgnoreCase(String status, String customerEmail);
+
+    // ===== BULK OPERATION =====
+    List<Invoice> findAllByIdIn(List<Long> ids);
 }

@@ -20,9 +20,9 @@ public class TwoFactorAuthenticationFilter extends OncePerRequestFilter {
             "/2fa/**", "/logout", "/css/", "/js/"
     );
 
-    private final FeatureFlagService featureFlagService;   // <-- ADDED
+    private final FeatureFlagService featureFlagService;
 
-    public TwoFactorAuthenticationFilter(FeatureFlagService featureFlagService) {   // <-- ADDED
+    public TwoFactorAuthenticationFilter(FeatureFlagService featureFlagService) {
         this.featureFlagService = featureFlagService;
     }
 
@@ -59,7 +59,7 @@ public class TwoFactorAuthenticationFilter extends OncePerRequestFilter {
 
         String uri = request.getRequestURI();
 
-        // Allow POST to /2fa/verify to pass through
+        // Allow POST to /2fa/verify to pass through (for both TOTP and backup codes)
         if (uri.equals("/2fa/verify") && "POST".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
@@ -67,7 +67,8 @@ public class TwoFactorAuthenticationFilter extends OncePerRequestFilter {
 
         // Public paths (GET only)
         if (uri.startsWith("/2fa/verify") || uri.startsWith("/2fa/setup") || uri.startsWith("/2fa/enable") ||
-            uri.startsWith("/2fa/disable") || uri.startsWith("/logout") || uri.startsWith("/css/") || uri.startsWith("/js/")) {
+            uri.startsWith("/2fa/disable") || uri.startsWith("/2fa/backup-codes") || 
+            uri.startsWith("/logout") || uri.startsWith("/css/") || uri.startsWith("/js/")) {
             filterChain.doFilter(request, response);
             return;
         }
