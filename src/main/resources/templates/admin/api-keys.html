@@ -20,6 +20,8 @@
         .btn-danger:hover { background: #a93226; }
         .btn-secondary { background: #3498db; color: white; }
         .btn-secondary:hover { background: #2980b9; }
+        .btn-close { background: #6c757d; color: white; }
+        .btn-close:hover { background: #5a6268; }
         table { border-collapse: collapse; width: 100%; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #f2f2f2; }
@@ -30,6 +32,100 @@
         .search-section input[type="text"] { flex: 1; min-width: 200px; }
         #keyTableBody tr:hover { background: #f5f5f5; }
         .empty-message { text-align: center; color: #888; padding: 30px; }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalIn 0.3s ease;
+        }
+        @keyframes modalIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h2 {
+            margin: 0;
+            color: #2d7a3a;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+        .modal-close:hover { color: #333; }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-body .warning {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 15px;
+        }
+        .modal-body .warning strong { color: #856404; }
+        .key-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            word-break: break-all;
+            border: 2px dashed #2d7a3a;
+            text-align: center;
+            user-select: all;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .copy-btn {
+            background: #2d7a3a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #1e5c2a; }
+        .copy-btn.copied { background: #28a745; }
+        .done-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .done-btn:hover { background: #5a6268; }
     </style>
 </head>
 <body>
@@ -37,7 +133,7 @@
     <h1>🔑 API Keys</h1>
     <a href="/dashboard">← Back to Dashboard</a>
 
-    <!-- Generate new key -->
+    <!-- Generate form -->
     <div class="form-group">
         <form id="generateForm" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <input type="text" id="keyName" placeholder="Key name (e.g., My App)" required/>
@@ -57,7 +153,7 @@
         <button id="clearSearchBtn" class="btn btn-secondary">Clear</button>
     </div>
 
-    <!-- Key table -->
+    <!-- Table -->
     <table>
         <thead>
             <tr>
@@ -72,33 +168,56 @@
             </tr>
         </thead>
         <tbody id="keyTableBody">
-            <!-- Rows rendered by JavaScript -->
+            <tr><td colspan="8" class="empty-message">Loading...</td></tr>
         </tbody>
     </table>
     <div id="emptyMessage" class="empty-message" style="display:none;">No keys found matching your criteria.</div>
+
+    <!-- ===== MODAL ===== -->
+    <div id="keyModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🔑 New API Key Generated</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="warning">
+                    <strong>⚠️ Important!</strong>
+                    <p>Copy this key now. It will <strong>never be shown again</strong>.</p>
+                    <p>If you lose it, you'll need to revoke and generate a new one.</p>
+                </div>
+                <div class="key-display" id="newKeyDisplay">ep_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div>
+                <p style="margin-top:10px; font-size:0.9em; color:#888;">Key name: <span id="keyNameDisplay">My App</span></p>
+            </div>
+            <div class="modal-footer">
+                <button class="copy-btn" id="copyKeyBtn" onclick="copyKey()">📋 Copy Key</button>
+                <button class="done-btn" onclick="closeModal()">I've Copied It</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
     (function() {
-        // State
-        let currentFilter = 'active'; // 'active', 'revoked', 'all'
+        let currentFilter = 'active';
         let currentSearch = '';
+        let pendingKey = null;
 
-        // DOM refs
         const tbody = document.getElementById('keyTableBody');
         const emptyMsg = document.getElementById('emptyMessage');
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         const clearSearchBtn = document.getElementById('clearSearchBtn');
         const generateForm = document.getElementById('generateForm');
+        const modal = document.getElementById('keyModal');
+        const keyDisplay = document.getElementById('newKeyDisplay');
+        const keyNameDisplay = document.getElementById('keyNameDisplay');
 
-        // Fetch and render keys
         function fetchKeys() {
             let url = '/admin/api-keys/list?';
             const params = [];
             if (currentFilter === 'active') params.push('active=true');
             else if (currentFilter === 'revoked') params.push('active=false');
-            // For 'all', we don't send active param
             if (currentSearch.trim()) {
                 params.push('search=' + encodeURIComponent(currentSearch.trim()));
             }
@@ -106,9 +225,7 @@
 
             fetch(url)
                 .then(response => response.json())
-                .then(data => {
-                    renderTable(data);
-                })
+                .then(data => renderTable(data))
                 .catch(err => {
                     console.error('Error fetching keys:', err);
                     tbody.innerHTML = '<tr><td colspan="8">Error loading keys.</td></tr>';
@@ -142,7 +259,6 @@
                 tbody.appendChild(row);
             });
 
-            // Attach revoke event listeners
             document.querySelectorAll('.revoke-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const id = this.dataset.id;
@@ -151,7 +267,7 @@
                             .then(response => response.text())
                             .then(msg => {
                                 alert(msg);
-                                fetchKeys(); // refresh
+                                fetchKeys();
                             })
                             .catch(err => {
                                 alert('Error revoking key: ' + err.message);
@@ -161,7 +277,46 @@
             });
         }
 
-        // Tab switching
+        function showModal(fullKey, name) {
+            keyDisplay.textContent = fullKey;
+            keyNameDisplay.textContent = name || 'Unnamed';
+            modal.classList.add('show');
+            pendingKey = fullKey;
+            document.getElementById('copyKeyBtn').textContent = '📋 Copy Key';
+            document.getElementById('copyKeyBtn').className = 'copy-btn';
+        }
+
+        window.closeModal = function() {
+            modal.classList.remove('show');
+        };
+
+        window.copyKey = function() {
+            if (pendingKey) {
+                navigator.clipboard.writeText(pendingKey).then(() => {
+                    const btn = document.getElementById('copyKeyBtn');
+                    btn.textContent = '✅ Copied!';
+                    btn.className = 'copy-btn copied';
+                }).catch(() => {
+                    // Fallback
+                    const textarea = document.createElement('textarea');
+                    textarea.value = pendingKey;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    const btn = document.getElementById('copyKeyBtn');
+                    btn.textContent = '✅ Copied!';
+                    btn.className = 'copy-btn copied';
+                });
+            }
+        };
+
+        // Close modal on overlay click
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -176,7 +331,6 @@
             currentSearch = searchInput.value;
             fetchKeys();
         }
-
         searchBtn.addEventListener('click', doSearch);
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -190,7 +344,7 @@
             fetchKeys();
         });
 
-        // Generate new key
+        // Generate
         generateForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const name = document.getElementById('keyName').value.trim();
@@ -204,8 +358,12 @@
             })
             .then(response => response.json())
             .then(data => {
+                // Show modal with the full key
+                // The full key is returned in the response (keyValue is the full key, not truncated)
+                // But the API returns ApiKeyResponse with keyValue as the full key
+                showModal(data.keyValue, data.name);
                 document.getElementById('keyName').value = '';
-                fetchKeys(); // refresh
+                fetchKeys();
             })
             .catch(err => {
                 alert('Error generating key: ' + err.message);

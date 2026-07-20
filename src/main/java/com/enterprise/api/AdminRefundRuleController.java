@@ -1,17 +1,32 @@
 package com.enterprise.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.enterprise.audit.RuleAuditService;
+import com.enterprise.identity.AppUser;
+import com.enterprise.identity.UserRepository;
 import com.enterprise.refund.RefundRule;
 import com.enterprise.refund.RefundRuleRepository;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/refund-rules")
@@ -20,12 +35,20 @@ public class AdminRefundRuleController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminRefundRuleController.class);
     private final RefundRuleRepository ruleRepository;
+    private final RuleAuditService ruleAuditService;
+    private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
-    public AdminRefundRuleController(RefundRuleRepository ruleRepository) {
+    public AdminRefundRuleController(RefundRuleRepository ruleRepository,
+                                     RuleAuditService ruleAuditService,
+                                     UserRepository userRepository,
+                                     ObjectMapper objectMapper) {
         this.ruleRepository = ruleRepository;
+        this.ruleAuditService = ruleAuditService;
+        this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
     }
 
-    // ----- List all rules with threshold -----
     @GetMapping
     public String listRules(@RequestParam(required = false) String search, Model model) {
         List<RefundRule> rules = ruleRepository.findAll();
@@ -38,12 +61,10 @@ public class AdminRefundRuleController {
         model.addAttribute("rules", rules);
         model.addAttribute("search", search);
 
-        // Extract current threshold from the "ALLOW" rule (if any)
         BigDecimal threshold = null;
         for (RefundRule rule : rules) {
             if ("ALLOW".equals(rule.getAction()) && rule.getConditionExpression().contains("amount")) {
                 String expr = rule.getConditionExpression();
-                // Handle expressions like "amount <= 1000" or "amount < 1000"
                 String[] parts = expr.replace("amount", "").trim().split("\\s+");
                 if (parts.length >= 2) {
                     try {
@@ -57,36 +78,44 @@ public class AdminRefundRuleController {
         return "admin/refund-rules/list";
     }
 
-    // ----- Quick threshold settings -----
-   @PostMapping("/settings")
-public String saveSettings(@RequestParam BigDecimal threshold,
-                           RedirectAttributes redirectAttributes) {
-    try {
-        ruleRepository.deleteAll();
+    @PostMapping("/settings")
+    public String saveSettings(@RequestParam BigDecimal threshold,
+                               Authentication authentication,
+                               RedirectAttributes redirectAttributes) {
+        try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
 
-        RefundRule allowRule = new RefundRule();
-        allowRule.setRulePriority(1);
-        allowRule.setConditionExpression("#amount <= " + threshold);   // ✅ fixed
-        allowRule.setAction("ALLOW");
-        allowRule.setActive(true);
-        ruleRepository.save(allowRule);
+            ruleRepository.deleteAll();
 
-        RefundRule denyRule = new RefundRule();
-        denyRule.setRulePriority(2);
-        denyRule.setConditionExpression("#amount > " + threshold);    // ✅ fixed
-        denyRule.setAction("DENY");
-        denyRule.setActive(true);
-        ruleRepository.save(denyRule);
+            RefundRule allowRule = new RefundRule();
+            allowRule.setRulePriority(1);
+            allowRule.setConditionExpression("#amount <= " + threshold);
+            allowRule.setAction("ALLOW");
+            allowRule.setActive(true);
+            Long tenantId = TenantContext.getTenantId();
+            allowRule.setTenantId(tenantId != null ? tenantId : 1L);
+            allowRule = ruleRepository.save(allowRule);
+            ruleAuditService.logChange("REFUND", allowRule.getId(), "CREATE", null, allowRule, admin.getId());
 
-        redirectAttributes.addFlashAttribute("success",
-                "Refund threshold updated. Amounts up to £" + threshold + " are refundable.");
-    } catch (Exception e) {
-        log.error("Error saving refund threshold", e);
-        redirectAttributes.addFlashAttribute("error", "Failed to save threshold: " + e.getMessage());
+            RefundRule denyRule = new RefundRule();
+            denyRule.setRulePriority(2);
+            denyRule.setConditionExpression("#amount > " + threshold);
+            denyRule.setAction("DENY");
+            denyRule.setActive(true);
+            denyRule.setTenantId(tenantId != null ? tenantId : 1L);
+            denyRule = ruleRepository.save(denyRule);
+            ruleAuditService.logChange("REFUND", denyRule.getId(), "CREATE", null, denyRule, admin.getId());
+
+            redirectAttributes.addFlashAttribute("success",
+                    "Refund threshold updated. Amounts up to £" + threshold + " are refundable.");
+        } catch (Exception e) {
+            log.error("Error saving refund threshold", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to save threshold: " + e.getMessage());
+        }
+        return "redirect:/admin/refund-rules";
     }
-    return "redirect:/admin/refund-rules";
-}
-    // ----- Create rule (full form) -----
+
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("rule", new RefundRule());
@@ -95,9 +124,18 @@ public String saveSettings(@RequestParam BigDecimal threshold,
 
     @PostMapping
     public String createRule(@ModelAttribute RefundRule rule,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
-            ruleRepository.save(rule);
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+            Long tenantId = TenantContext.getTenantId();
+            rule.setTenantId(tenantId != null ? tenantId : 1L);
+            rule.setActive(true);
+            RefundRule savedRule = ruleRepository.save(rule);
+            ruleAuditService.logChange("REFUND", savedRule.getId(), "CREATE", null, savedRule, admin.getId());
+
             redirectAttributes.addFlashAttribute("success", "Refund rule created.");
         } catch (Exception e) {
             log.error("Error creating refund rule", e);
@@ -106,7 +144,6 @@ public String saveSettings(@RequestParam BigDecimal threshold,
         return "redirect:/admin/refund-rules";
     }
 
-    // ----- Edit rule -----
     @GetMapping("/{id}/edit")
     public String showEditForm(@PathVariable Long id, Model model) {
         RefundRule rule = ruleRepository.findById(id)
@@ -118,10 +155,20 @@ public String saveSettings(@RequestParam BigDecimal threshold,
     @PostMapping("/{id}")
     public String updateRule(@PathVariable Long id,
                              @ModelAttribute RefundRule rule,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+            RefundRule oldRule = ruleRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Rule not found"));
+
             rule.setId(id);
-            ruleRepository.save(rule);
+            rule.setCreatedAt(oldRule.getCreatedAt());
+            RefundRule savedRule = ruleRepository.save(rule);
+            ruleAuditService.logChange("REFUND", savedRule.getId(), "UPDATE", oldRule, savedRule, admin.getId());
+
             redirectAttributes.addFlashAttribute("success", "Refund rule updated.");
         } catch (Exception e) {
             log.error("Error updating refund rule", e);
@@ -130,11 +177,18 @@ public String saveSettings(@RequestParam BigDecimal threshold,
         return "redirect:/admin/refund-rules";
     }
 
-    // ----- Delete rule -----
     @PostMapping("/{id}/delete")
     public String deleteRule(@PathVariable Long id,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+            RefundRule rule = ruleRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Rule not found"));
+            ruleAuditService.logChange("REFUND", id, "DELETE", rule, null, admin.getId());
+
             ruleRepository.deleteById(id);
             redirectAttributes.addFlashAttribute("success", "Refund rule deleted.");
         } catch (Exception e) {
@@ -144,20 +198,87 @@ public String saveSettings(@RequestParam BigDecimal threshold,
         return "redirect:/admin/refund-rules";
     }
 
-    // ----- Toggle active -----
     @PostMapping("/{id}/toggle")
     public String toggleRule(@PathVariable Long id,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser admin = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+
             RefundRule rule = ruleRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Rule not found"));
+
+            RefundRule oldRule = new RefundRule();
+            oldRule.setId(rule.getId());
+            oldRule.setRulePriority(rule.getRulePriority());
+            oldRule.setConditionExpression(rule.getConditionExpression());
+            oldRule.setAction(rule.getAction());
+            oldRule.setRequiredPermission(rule.getRequiredPermission());
+            oldRule.setActive(rule.isActive());
+
             rule.setActive(!rule.isActive());
-            ruleRepository.save(rule);
+            RefundRule savedRule = ruleRepository.save(rule);
+            ruleAuditService.logChange("REFUND", savedRule.getId(), "TOGGLE", oldRule, savedRule, admin.getId());
+
             redirectAttributes.addFlashAttribute("success",
                     rule.isActive() ? "Refund rule activated." : "Refund rule deactivated.");
         } catch (Exception e) {
             log.error("Error toggling refund rule", e);
             redirectAttributes.addFlashAttribute("error", "Failed to toggle rule: " + e.getMessage());
+        }
+        return "redirect:/admin/refund-rules";
+    }
+
+    // ===== EXPORT =====
+    @GetMapping("/export")
+    @ResponseBody
+    public ResponseEntity<String> exportRules(Authentication authentication) {
+        AppUser admin = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        Long tenantId = admin.getTenantId();
+        List<RefundRule> rules = ruleRepository.findAll().stream()
+                .filter(r -> r.getTenantId().equals(tenantId))
+                .collect(Collectors.toList());
+        try {
+            String json = objectMapper.writeValueAsString(rules);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=refund-rules.json")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(json);
+        } catch (JsonProcessingException e) {
+            log.error("Export failed", e);
+            return ResponseEntity.internalServerError().body("Export failed");
+        }
+    }
+
+    // ===== IMPORT =====
+    @PostMapping("/import")
+    public String importRules(@RequestParam("file") MultipartFile file,
+                              Authentication authentication,
+                              RedirectAttributes redirectAttributes) {
+        AppUser admin = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        Long tenantId = admin.getTenantId();
+        try {
+            String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+            List<RefundRule> importedRules = objectMapper.readValue(content,
+                    new TypeReference<List<RefundRule>>() {});
+            for (RefundRule rule : importedRules) {
+                rule.setId(null);
+                rule.setTenantId(tenantId);
+                rule.setCreatedAt(LocalDateTime.now());
+            }
+            List<RefundRule> existing = ruleRepository.findAll().stream()
+                    .filter(r -> r.getTenantId().equals(tenantId))
+                    .collect(Collectors.toList());
+            ruleRepository.deleteAll(existing);
+            ruleRepository.saveAll(importedRules);
+            redirectAttributes.addFlashAttribute("success",
+                    "Imported " + importedRules.size() + " refund rules.");
+        } catch (Exception e) {
+            log.error("Import failed", e);
+            redirectAttributes.addFlashAttribute("error", "Import failed: " + e.getMessage());
         }
         return "redirect:/admin/refund-rules";
     }

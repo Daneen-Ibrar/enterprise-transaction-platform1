@@ -3,6 +3,7 @@
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <title>Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .card { border: 1px solid #ddd; padding: 20px; margin: 10px; border-radius: 8px; display: inline-block; min-width: 180px; }
         .card-number { font-size: 2em; font-weight: bold; }
@@ -17,6 +18,11 @@
         .widget { border: 1px solid #ddd; padding: 15px; margin: 10px; border-radius: 8px; display: inline-block; min-width: 200px; }
         .widget-warning { border-color: #ff9800; background-color: #fff3e0; }
         .widget-danger { border-color: #f44336; background-color: #ffebee; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; background: #3498db; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .chart-container { position: relative; height: 180px; width: 100%; }
+        .chart-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: #f9f9f9; flex: 1; min-width: 250px; }
+        .chart-row { display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -64,7 +70,26 @@
 
     <hr/>
 
-    <!-- ========== SUSPICIOUS INVOICES WIDGET (FIXED) ========== -->
+    <!-- ===== CHARTS SECTION (NEW) ===== -->
+    <h2>📈 Quick Overview (Last 7 Days)</h2>
+    <div class="chart-row">
+        <div class="chart-card">
+            <h4>Transaction Volume</h4>
+            <div class="chart-container">
+                <canvas id="dashboardVolumeChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h4>Status Distribution</h4>
+            <div class="chart-container">
+                <canvas id="dashboardStatusChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <hr/>
+
+    <!-- ========== SUSPICIOUS INVOICES WIDGET ========== -->
     <div sec:authorize="hasRole('ADMIN')">
         <div class="widget" th:classappend="${suspiciousCount > 0 ? 'widget-warning' : ''}">
             <h3>🚨 Suspicious Invoices</h3>
@@ -73,7 +98,6 @@
             <a href="/admin/invoices/suspicious">View Suspicious →</a>
         </div>
     </div>
-    <!-- ======================================================== -->
 
     <hr/>
 
@@ -91,24 +115,39 @@
         <li sec:authorize="hasRole('CUSTOMER')">
             <a href="/invoices/customer">💳 My Invoices</a>
         </li>
-  <li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/approval-rules">⚙️ Approval Rules</a>
+        <li>
+    <a href="/2fa/backup-codes">🔑 Backup Codes</a>
+</li>
+        <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/activity">📋 User Activity Logs</a>
+</li>
+        <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/suspicion-rules">⚠️ Suspicion Rules</a>
 </li>
 <li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/refund-rules">⚙️ Refund Rules</a>
+    <a href="/admin/locks">🔒 Locked Users</a>
 </li>
-<li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/tenants">🏢 Manage Tenants</a>
+        <li sec:authorize="hasRole('ADMIN')">
+            <a href="/admin/approval-rules">⚙️ Approval Rules</a>
+        </li>
+        <li sec:authorize="hasRole('ADMIN')">
+            <a href="/admin/refund-rules">⚙️ Refund Rules</a>
+        </li>
+        <li sec:authorize="hasRole('ADMIN')">
+    <a href="/admin/rule-audit">📜 Rule Audit Trail</a>
 </li>
+        <li sec:authorize="hasRole('ADMIN')">
+            <a href="/admin/tenants">🏢 Manage Tenants</a>
+        </li>
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/invoices/pending">⏳ Pending Approvals</a>
         </li>
         <li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/webhooks">🌐 Webhooks</a>
-</li>
-<li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/features">⚙️ Feature Toggles</a>
-</li>
+            <a href="/admin/webhooks">🌐 Webhooks</a>
+        </li>
+        <li sec:authorize="hasRole('ADMIN')">
+            <a href="/admin/features">⚙️ Feature Toggles</a>
+        </li>
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/transactions">📊 View All Transactions</a>
         </li>
@@ -133,12 +172,12 @@
         <li sec:authorize="hasAnyRole('ADMIN', 'AUDITOR')">
             <a href="/audit/events">🔍 Audit Events & Verification</a>
         </li>
-      <li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/users/restore">🔓 Restore User Access</a>
-</li>
-<li sec:authorize="hasRole('ADMIN')">
-    <a href="/admin/users">👥 User Management</a>
-</li>
+        <li sec:authorize="hasRole('ADMIN')">
+            <a href="/admin/users/restore">🔓 Restore User Access</a>
+        </li>
+        <li sec:authorize="hasRole('ADMIN')">
+            <a href="/admin/users">👥 User Management</a>
+        </li>
         <li sec:authorize="hasAnyRole('ADMIN', 'AUDITOR')">
             <a href="/export/transactions/csv">📥 Export Transactions (CSV)</a>
         </li>
@@ -149,6 +188,13 @@
             <a href="/2fa/setup">🔐 Two‑Factor Setup</a>
         </li>
     </ul>
+
+    <!-- ===== EXPORT BUTTONS ===== -->
+    <div style="margin-top: 30px;">
+        <a th:href="@{/admin/reports/data/transactions/csv}" class="btn">Download CSV</a>
+        <a th:href="@{/admin/reports/export/pdf(startDate=${startDate}, endDate=${endDate})}" class="btn" style="background: #c0392b;">Download PDF</a>
+        <a th:href="@{/admin/reports/export/excel(startDate=${startDate}, endDate=${endDate})}" class="btn" style="background: #2980b9;">Download Excel</a>
+    </div>
 
     <hr/>
 
@@ -191,6 +237,64 @@
             var bell = document.querySelector('.notification-bell');
             if (!bell.contains(event.target)) {
                 document.getElementById('notificationDropdown').classList.remove('show');
+            }
+        });
+    </script>
+
+    <!-- Chart.js for main dashboard -->
+    <script th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const labels = /*[[${dashboardLabels}]]*/ [];
+            const volumeData = /*[[${dashboardVolumeData}]]*/ [];
+            const statusLabels = /*[[${dashboardStatusLabels}]]*/ [];
+            const statusValues = /*[[${dashboardStatusValues}]]*/ [];
+
+            // Volume Chart (Bar)
+            const ctx1 = document.getElementById('dashboardVolumeChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Transactions',
+                        data: volumeData,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // Status Distribution (Pie)
+            if (statusLabels.length > 0) {
+                const ctx2 = document.getElementById('dashboardStatusChart').getContext('2d');
+                new Chart(ctx2, {
+                    type: 'pie',
+                    data: {
+                        labels: statusLabels,
+                        datasets: [{
+                            data: statusValues,
+                            backgroundColor: ['#2d7a3a', '#c0392b', '#f39c12', '#2980b9', '#8e44ad']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
             }
         });
     </script>

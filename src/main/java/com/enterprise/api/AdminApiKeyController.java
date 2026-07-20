@@ -69,6 +69,9 @@ public class AdminApiKeyController {
         AppUser admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         ApiKey key = apiKeyService.generateApiKey(admin, name);
+        
+        // The key is saved with the full keyValue (not truncated)
+        // So ApiKeyResponse will contain the full key
         return new ApiKeyResponse(key);
     }
 

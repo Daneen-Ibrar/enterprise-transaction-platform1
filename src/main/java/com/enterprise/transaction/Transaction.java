@@ -42,6 +42,17 @@ public class Transaction {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+@Version
+@Column(name = "version", nullable = false)
+private Long version = 0L;
+
+// Getter and setter
+public Long getVersion() { return version; }
+public void setVersion(Long version) { this.version = version; }
+
     // Constructors
     public Transaction() {}
 
@@ -101,4 +112,7 @@ public class Transaction {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

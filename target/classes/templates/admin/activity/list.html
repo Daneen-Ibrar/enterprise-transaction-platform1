@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>User Activity Logs</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .filter-bar { margin: 15px 0; padding: 15px; background: #f5f5f5; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
+        .filter-bar select, .filter-bar input, .filter-bar button { padding: 6px 10px; }
+        .btn { padding: 6px 15px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-login { background: #d4edda; color: #155724; }
+        .badge-logout { background: #f8d7da; color: #721c24; }
+        .badge-account { background: #cce5ff; color: #004085; }
+        .badge-role { background: #fff3cd; color: #856404; }
+        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
+        .pagination { margin-top: 15px; display: flex; gap: 5px; }
+        .pagination a, .pagination span { padding: 6px 12px; border: 1px solid #ddd; text-decoration: none; }
+        .pagination .active { background: #2d7a3a; color: white; border-color: #2d7a3a; }
+    </style>
+</head>
+<body>
+    <h1>📋 User Activity Logs</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <form method="get" th:action="@{/admin/activity}" id="filterForm">
+            <label>User:
+                <select name="userId">
+                    <option value="">All Users</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.email}" th:selected="${u.id == selectedUserId}"></option>
+                </select>
+            </label>
+            <label>Action:
+                <select name="action">
+                    <option value="">All Actions</option>
+                    <option th:each="a : ${actions}" th:value="${a}" th:text="${a}" th:selected="${a == selectedAction}"></option>
+                </select>
+            </label>
+            <label>From:
+                <input type="date" name="startDate" th:value="${startDate}"/>
+            </label>
+            <label>To:
+                <input type="date" name="endDate" th:value="${endDate}"/>
+            </label>
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a th:href="@{/admin/activity}" class="btn btn-secondary">Clear</a>
+        </form>
+    </div>
+
+    <div th:if="${logs.empty}" style="padding:20px; text-align:center; color:#888;">
+        No activity logs found.
+    </div>
+
+    <table th:unless="${logs.empty}">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Details</th>
+                <th>IP Address</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="log : ${logs.content}">
+                <td th:text="${log.id}">1</td>
+                <td th:text="${log.userEmail != null ? log.userEmail : log.userId}">user@test.com</td>
+                <td>
+                    <span class="badge"
+                          th:classappend="${log.action == 'LOGIN_SUCCESS' || log.action == 'LOGIN_FAILURE' ? 'badge-login' : log.action == 'LOGOUT' ? 'badge-logout' : log.action == 'ACCOUNT_CREATED' || log.action == 'ACCOUNT_REVOKED' || log.action == 'ACCOUNT_RESTORED' ? 'badge-account' : 'badge-role'}">
+                        <span th:text="${log.action}">LOGIN_SUCCESS</span>
+                    </span>
+                </td>
+                <td th:text="${log.details}">Details</td>
+                <td th:text="${log.ipAddress}">192.168.1.1</td>
+                <td th:text="${log.createdAt}">2026-01-01 12:00</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <div class="pagination" th:unless="${logs.empty}">
+        <span th:if="${currentPage > 0}">
+            <a th:href="@{/admin/activity(page=${currentPage - 1}, userId=${selectedUserId}, action=${selectedAction}, startDate=${startDate}, endDate=${endDate})}">← Previous</a>
+        </span>
+        <span class="active" th:text="${currentPage + 1}">1</span>
+        <span th:if="${currentPage + 1 < totalPages}">
+            <a th:href="@{/admin/activity(page=${currentPage + 1}, userId=${selectedUserId}, action=${selectedAction}, startDate=${startDate}, endDate=${endDate})}">Next →</a>
+        </span>
+    </div>
+</body>
+</html>

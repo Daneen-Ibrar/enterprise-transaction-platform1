@@ -17,6 +17,7 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,7 +54,6 @@ public class RefundService {
     public RefundEligibility evaluate(Transaction transaction) {
         log.info("Evaluating refund eligibility for transaction {}", transaction.getId());
         List<RefundRule> rules = ruleRepository.findByActiveTrueOrderByRulePriorityAsc();
-        log.info("Found {} active refund rules", rules.size());
         StandardEvaluationContext context = new StandardEvaluationContext();
         context.setVariable("amount", transaction.getAmount());
         context.setVariable("customerId", transaction.getCustomerId());
@@ -75,9 +75,9 @@ public class RefundService {
         return new RefundEligibility("DENY", null);
     }
 
+    // ===== SINGLE REFUND =====
     @Transactional
     public Transaction processRefund(Long originalTransactionId, Long adminId, String reason) {
-        // ----- FEATURE FLAG CHECK -----
         if (!featureFlagService.isEnabled("REFUNDS")) {
             throw new RuntimeException("Refund feature is currently disabled.");
         }
@@ -101,9 +101,11 @@ public class RefundService {
                 original.getAmount().negate(),
                 "refund-" + System.currentTimeMillis()
         );
+        // ===== FIX: Set tenant ID from original transaction =====
+        refund.setTenantId(original.getTenantId());
+
         refund.setStatus(TransactionStatus.REFUNDED);
         refund = transactionRepository.save(refund);
-        log.info("Refund transaction created with id {}", refund.getId());
 
         ledgerService.recordCredit(original.getCustomerId(), original.getAmount(), refund.getId());
         ledgerService.recordDebit(original.getMerchantId(), original.getAmount(), refund.getId());
@@ -111,20 +113,44 @@ public class RefundService {
         original.setStatus(TransactionStatus.REFUNDED);
         transactionRepository.save(original);
 
-        // Audit with snapshots – before: original (before refund), after: refund
+        // Audit
+        Map<String, Object> beforeMap = new HashMap<>();
+        beforeMap.put("id", original.getId());
+        beforeMap.put("invoiceId", original.getInvoiceId());
+        beforeMap.put("customerId", original.getCustomerId());
+        beforeMap.put("merchantId", original.getMerchantId());
+        beforeMap.put("amount", original.getAmount());
+        beforeMap.put("currency", original.getCurrency());
+        beforeMap.put("status", original.getStatus().name());
+        beforeMap.put("idempotencyKey", original.getIdempotencyKey());
+        beforeMap.put("createdAt", original.getCreatedAt());
+        beforeMap.put("updatedAt", original.getUpdatedAt());
+
+        Map<String, Object> afterMap = new HashMap<>();
+        afterMap.put("id", refund.getId());
+        afterMap.put("invoiceId", refund.getInvoiceId());
+        afterMap.put("customerId", refund.getCustomerId());
+        afterMap.put("merchantId", refund.getMerchantId());
+        afterMap.put("amount", refund.getAmount());
+        afterMap.put("currency", refund.getCurrency());
+        afterMap.put("status", refund.getStatus().name());
+        afterMap.put("idempotencyKey", refund.getIdempotencyKey());
+        afterMap.put("createdAt", refund.getCreatedAt());
+        afterMap.put("updatedAt", refund.getUpdatedAt());
+
         auditService.recordEvent(
-            "REFUND_PROCESSED",
-            adminId,
-            Map.of(
-                "originalTransactionId", originalTransactionId,
-                "refundTransactionId", refund.getId(),
-                "amount", original.getAmount(),
-                "reason", reason
-            ),
-            "Transaction",
-            refund.getId(),
-            original,   // previous state – original transaction (still SETTLED before we changed it)
-            refund      // current state – the refund transaction
+                "REFUND_PROCESSED",
+                adminId,
+                Map.of(
+                        "originalTransactionId", originalTransactionId,
+                        "refundTransactionId", refund.getId(),
+                        "amount", original.getAmount(),
+                        "reason", reason
+                ),
+                "Transaction",
+                refund.getId(),
+                beforeMap,
+                afterMap
         );
 
         notificationService.createNotification(original.getCustomerId(),
@@ -140,6 +166,28 @@ public class RefundService {
         log.info("Refund completed for transaction {}", originalTransactionId);
 
         return refund;
+    }
+
+    // ===== BULK REFUND (NO @Transactional) =====
+    public int bulkRefundTransactions(List<Long> transactionIds, Long adminId, String reason) {
+        log.info("Bulk refunding {} transactions by admin {}", transactionIds.size(), adminId);
+        if (!featureFlagService.isEnabled("REFUNDS")) {
+            throw new RuntimeException("Refund feature is currently disabled.");
+        }
+        int refundedCount = 0;
+        for (Long txId : transactionIds) {
+            try {
+                log.info("Attempting refund for transaction {}", txId);
+                processRefund(txId, adminId, reason);
+                refundedCount++;
+                log.info("Successfully refunded transaction {}", txId);
+                Thread.sleep(50);
+            } catch (Exception e) {
+                log.error("Failed to refund transaction {}: {}", txId, e.getMessage(), e);
+            }
+        }
+        log.info("Bulk refund completed: {} out of {} successful", refundedCount, transactionIds.size());
+        return refundedCount;
     }
 
     public static class RefundEligibility {

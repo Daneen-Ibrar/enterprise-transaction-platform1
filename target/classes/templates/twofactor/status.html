@@ -2,13 +2,71 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>2FA Status</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .success { color: green; padding: 10px; border: 1px solid green; background: #eeffee; margin: 10px 0; }
+        .backup-codes { background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 15px 0; font-family: monospace; }
+        .backup-codes code { display: block; padding: 4px 0; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-success { background: #2d7a3a; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .warning { background: #fff3cd; padding: 10px; border: 1px solid #ffc107; margin: 10px 0; }
+    </style>
 </head>
 <body>
-    <h1>🔐 2FA Status</h1>
+    <h1>🔐 Two‑Factor Authentication</h1>
     <a href="/dashboard">← Back to Dashboard</a>
-    <p>✅ Two‑factor authentication is <strong>enabled</strong>.</p>
-    <form method="post" th:action="@{/2fa/disable}">
-        <button type="submit">Disable 2FA</button>
-    </form>
+
+    <div th:if="${enabled}" class="success">
+        <p>✅ Two‑factor authentication is <strong>enabled</strong> for your account.</p>
+    </div>
+
+    <!-- Show backup codes after enabling -->
+    <div th:if="${backupCodes != null}">
+        <div class="success">
+            <p>✅ 2FA enabled successfully!</p>
+        </div>
+        <div class="warning">
+            <p><strong>⚠️ Save these backup codes!</strong></p>
+            <p>These codes can be used to access your account if you lose your authenticator app.</p>
+            <p>Store them in a safe place. Each code can only be used once.</p>
+        </div>
+        <div class="backup-codes">
+            <div th:each="code : ${backupCodes}">
+                <code th:text="${code}">XXXX-XXXX</code>
+            </div>
+        </div>
+        <a href="/2fa/backup-codes" class="btn btn-primary">View Backup Codes</a>
+        <br/><br/>
+    </div>
+
+    <div th:if="${regenerated != null && regenerated}">
+        <div class="success">
+            <p>✅ Backup codes regenerated successfully!</p>
+        </div>
+        <div class="backup-codes">
+            <div th:each="code : ${backupCodes}">
+                <code th:text="${code}">XXXX-XXXX</code>
+            </div>
+        </div>
+        <a href="/2fa/backup-codes" class="btn btn-primary">View Backup Codes</a>
+        <br/><br/>
+    </div>
+
+    <div th:if="${enabled}">
+        <p><strong>Remaining backup codes:</strong> <span th:text="${backupCodesCount}">10</span></p>
+        <a href="/2fa/backup-codes" class="btn btn-primary">View / Regenerate Backup Codes</a>
+        <br/><br/>
+        <form method="post" th:action="@{/2fa/disable}" style="display:inline;">
+            <button type="submit" class="btn btn-danger">Disable 2FA</button>
+        </form>
+    </div>
+
+    <div th:unless="${enabled}">
+        <p>Two-factor authentication is not enabled for your account.</p>
+        <a href="/2fa/setup" class="btn btn-success">Set up 2FA</a>
+    </div>
 </body>
 </html>

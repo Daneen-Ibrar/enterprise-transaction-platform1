@@ -3,6 +3,7 @@ package com.enterprise.invoice;
 import com.enterprise.feature.FeatureFlagService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
@@ -16,13 +17,16 @@ public class SuspicionService {
     private static final Logger log = LoggerFactory.getLogger(SuspicionService.class);
 
     private final SuspicionRuleRepository ruleRepository;
-    private final FeatureFlagService featureFlagService;   // <-- ADDED
+    private final FeatureFlagService featureFlagService;
+    private final InvoiceService invoiceService;
     private final ExpressionParser parser = new SpelExpressionParser();
 
     public SuspicionService(SuspicionRuleRepository ruleRepository,
-                            FeatureFlagService featureFlagService) {   // <-- ADDED
+                            FeatureFlagService featureFlagService,
+                            @Lazy InvoiceService invoiceService) {
         this.ruleRepository = ruleRepository;
         this.featureFlagService = featureFlagService;
+        this.invoiceService = invoiceService;
     }
 
     public SuspicionResult evaluate(Invoice invoice) {
@@ -62,6 +66,14 @@ public class SuspicionService {
         }
         log.info("No matches – returning GREEN");
         return new SuspicionResult("GREEN", "Normal invoice");
+    }
+
+    /**
+     * Re‑evaluate all invoices after suspicion rules change.
+     * Delegates to InvoiceService to update all non‑paid invoices.
+     */
+    public void reEvaluateAllInvoices() {
+        invoiceService.reEvaluateAllInvoicesForSuspicion();
     }
 
     public static class SuspicionResult {

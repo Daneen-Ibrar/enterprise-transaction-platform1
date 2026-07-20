@@ -11,6 +11,7 @@
         .error { color: red; margin: 10px 0; }
         .checkbox-group { max-width: 400px; }
         .checkbox-group label { display: inline-block; margin-right: 15px; }
+        .tenant-display { padding: 8px; background: #f0f0f0; border-radius: 4px; display: inline-block; }
     </style>
 </head>
 <body>
@@ -35,11 +36,17 @@
         </div>
         <p style="font-size: 0.8em; color: #888;">If no role selected, user will be assigned CUSTOMER.</p>
 
-        <!-- ===== TENANT DROPDOWN ===== -->
-        <label for="tenantId">Tenant:</label>
-        <select id="tenantId" name="tenantId" required>
-            <option th:each="t : ${allTenants}" th:value="${t.id}" th:text="${t.name}"></option>
-        </select>
+        <!-- Tenant: dropdown for super admin, read-only for others -->
+        <div th:if="${isSuperAdmin}">
+            <label for="tenantId">Tenant:</label>
+            <select id="tenantId" name="tenantId" required>
+                <option th:each="t : ${allTenants}" th:value="${t.id}" th:text="${t.name}"></option>
+            </select>
+        </div>
+        <div th:unless="${isSuperAdmin}">
+            <label>Tenant:</label>
+            <div class="tenant-display" th:text="${currentTenant != null ? currentTenant.name : 'Default'}">Default</div>
+        </div>
 
         <button type="submit">Create User</button>
     </form>

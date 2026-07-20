@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Suspicion Rules</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-create { background: #2d7a3a; color: white; padding: 8px 16px; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-delete { background: #c0392b; color: white; }
+        .btn-toggle { background: #e67e22; color: white; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-active { background: #d4edda; color: #155724; }
+        .badge-inactive { background: #f8d7da; color: #721c24; }
+        .badge-red { background: #f8d7da; color: #721c24; }
+        .badge-yellow { background: #fff3cd; color: #856404; }
+        .badge-green { background: #d4edda; color: #155724; }
+        .actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
+        .flash-error { background: #f8d7da; color: #721c24; padding: 10px; border: 1px solid #f5c6cb; margin: 10px 0; }
+        .priority-badge { background: #e9ecef; padding: 2px 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>⚠️ Suspicion Rules</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+    <a href="/admin/suspicion-rules/create" class="btn btn-create" style="margin-left: 20px;">+ Create Rule</a>
+<!-- Export / Import -->
+<div style="margin: 15px 0;">
+    <a th:href="@{/admin/suspicion-rules/export}" class="btn btn-primary" style="background:#2d7a3a;">📤 Export JSON</a>
+    <form method="post" th:action="@{/admin/suspicion-rules/import}" enctype="multipart/form-data" style="display:inline-block; margin-left:10px;">
+        <input type="file" name="file" accept=".json" required style="display:inline-block;"/>
+        <button type="submit" class="btn btn-primary" style="background:#2980b9;">📥 Import JSON</button>
+    </form>
+</div>
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Priority</th>
+                <th>Condition (SpEL)</th>
+                <th>Risk Level</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="rule : ${rules}">
+                <td th:text="${rule.priority}">10</td>
+                <td th:text="${rule.conditionExpression}">#description.contains("urgent")</td>
+                <td>
+                    <span class="badge" th:classappend="${rule.riskLevel == 'RED' ? 'badge-red' : rule.riskLevel == 'YELLOW' ? 'badge-yellow' : 'badge-green'}"
+                          th:text="${rule.riskLevel}">
+                    </span>
+                </td>
+                <td th:text="${rule.description}">Description</td>
+                <td>
+                    <span class="badge" th:classappend="${rule.active ? 'badge-active' : 'badge-inactive'}"
+                          th:text="${rule.active ? 'Active' : 'Inactive'}">
+                    </span>
+                </td>
+                <td class="actions">
+                    <a th:href="@{/admin/suspicion-rules/{id}/edit(id=${rule.id})}" class="btn btn-edit">✏️ Edit</a>
+                    <form method="post" th:action="@{/admin/suspicion-rules/{id}/toggle(id=${rule.id})}" style="display:inline;">
+                        <button type="submit" class="btn btn-toggle"
+                                th:data-active="${rule.active}"
+                                onclick="return confirmToggle(this);"
+                                th:text="${rule.active ? 'Deactivate' : 'Activate'}">
+                        </button>
+                    </form>
+                    <form method="post" th:action="@{/admin/suspicion-rules/{id}/delete(id=${rule.id})}" style="display:inline;">
+                        <button type="submit" class="btn btn-delete"
+                                onclick="return confirm('Delete this rule? This will re-evaluate all invoices.')">
+                            🗑️
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            <tr th:if="${rules.empty}">
+                <td colspan="6">No suspicion rules defined. Create one to start detecting suspicious invoices.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        function confirmToggle(button) {
+            var active = button.getAttribute('data-active') === 'true';
+            var action = active ? 'deactivate' : 'activate';
+            return confirm('Are you sure you want to ' + action + ' this rule? This will re-evaluate all invoices.');
+        }
+    </script>
+</body>
+</html>

@@ -3,9 +3,11 @@ package com.enterprise.invoice;
 import com.enterprise.identity.AppUser;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "private_message")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PrivateMessage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,6 +31,10 @@ public class PrivateMessage {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     public PrivateMessage() {}
 
     public PrivateMessage(Invoice invoice, AppUser sender, AppUser recipient, String message) {
@@ -51,4 +57,7 @@ public class PrivateMessage {
     public void setMessage(String message) { this.message = message; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

@@ -1,2 +1,10 @@
+com/enterprise/integration/PaymentInvariantTest.class
 com/enterprise/transaction/TransactionIntegrationTest.class
+com/enterprise/api/v1/ApiContractTest.class
 com/enterprise/identity/AuthenticationIntegrationTest.class
+com/enterprise/integration/MultiTenantIntegrationTest.class
+com/enterprise/integration/BaseIntegrationTest.class
+com/enterprise/integration/DlqSchedulerIntegrationTest.class
+com/enterprise/integration/RefundIntegrationTest.class
+com/enterprise/util/TestDataBuilder.class
+com/enterprise/integration/PaymentIntegrationTest.class

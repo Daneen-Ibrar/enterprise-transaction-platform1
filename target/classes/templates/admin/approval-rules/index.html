@@ -45,6 +45,14 @@
     <a href="/dashboard">← Back to Dashboard</a>
     <a href="/admin/approval-rules/create" class="btn btn-create" style="margin-left: 20px;">+ Create Custom Rule</a>
 
+<!-- Export / Import -->
+<div style="margin: 15px 0;">
+    <a th:href="@{/admin/approval-rules/export}" class="btn btn-primary" style="background:#2d7a3a;">📤 Export JSON</a>
+    <form method="post" th:action="@{/admin/approval-rules/import}" enctype="multipart/form-data" style="display:inline-block; margin-left:10px;">
+        <input type="file" name="file" accept=".json" required style="display:inline-block;"/>
+        <button type="submit" class="btn btn-primary" style="background:#2980b9;">📥 Import JSON</button>
+    </form>
+</div>
     <!-- Flash messages -->
     <div th:if="${success}" class="flash-success" th:text="${success}"></div>
     <div th:if="${error}" class="flash-error" th:text="${error}"></div>

@@ -1,47 +1,45 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Create User</title>
+    <title>Create Tenant</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
-        label { display: block; margin: 10px 0 5px; }
-        input, select { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; }
+        input { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
+        textarea { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
         button { padding: 8px 20px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background: #1e5c2a; }
+        .checkbox-group { margin: 10px 0; }
+        .checkbox-group label { display: inline; font-weight: normal; }
         .error { color: red; margin: 10px 0; }
-        .checkbox-group { max-width: 400px; }
-        .checkbox-group label { display: inline-block; margin-right: 15px; }
+        .field-group { margin-bottom: 15px; }
     </style>
 </head>
 <body>
-    <h1>➕ Create New User</h1>
-    <a href="/admin/users">← Back to User List</a>
+    <h1>🏢 Create Tenant</h1>
+    <a href="/admin/tenants">← Back to Tenants</a>
 
     <div th:if="${error}" class="error" th:text="${error}"></div>
 
-    <form method="post" th:action="@{/admin/users}">
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required />
-
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required minlength="6" />
-
-        <label>Roles:</label>
-        <div class="checkbox-group">
-            <div th:each="role : ${allRoles}">
-                <input type="checkbox" th:id="'role_' + ${role.id}" th:name="roleIds" th:value="${role.id}" />
-                <label th:for="'role_' + ${role.id}" th:text="${role.name}">ROLE</label>
-            </div>
+    <form method="post" th:action="@{/admin/tenants}">
+        <div class="field-group">
+            <label for="name">Tenant Name:</label>
+            <input type="text" id="name" name="name" placeholder="e.g., Acme Corp" required />
         </div>
-        <p style="font-size: 0.8em; color: #888;">If no role selected, user will be assigned CUSTOMER.</p>
 
-        <!-- ===== TENANT DROPDOWN ===== -->
-        <label for="tenantId">Tenant:</label>
-        <select id="tenantId" name="tenantId" required>
-            <option th:each="t : ${allTenants}" th:value="${t.id}" th:text="${t.name}"></option>
-        </select>
+        <div class="field-group">
+            <label for="description">Description (optional):</label>
+            <textarea id="description" name="description" rows="3" placeholder="Brief description of this tenant..."></textarea>
+        </div>
 
-        <button type="submit">Create User</button>
+        <div class="checkbox-group">
+            <label>
+                <input type="checkbox" name="active" value="true" checked />
+                Active
+            </label>
+        </div>
+
+        <button type="submit">Create Tenant</button>
     </form>
 </body>
 </html>

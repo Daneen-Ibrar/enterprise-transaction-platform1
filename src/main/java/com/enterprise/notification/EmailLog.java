@@ -32,6 +32,10 @@ public class EmailLog {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     public EmailLog() {}
 
     public EmailLog(String recipient, String subject, String body) {
@@ -44,18 +48,28 @@ public class EmailLog {
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
     public String getRecipient() { return recipient; }
     public void setRecipient(String recipient) { this.recipient = recipient; }
+
     public String getSubject() { return subject; }
     public void setSubject(String subject) { this.subject = subject; }
+
     public String getBody() { return body; }
     public void setBody(String body) { this.body = body; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+
     public LocalDateTime getSentAt() { return sentAt; }
     public void setSentAt(LocalDateTime sentAt) { this.sentAt = sentAt; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

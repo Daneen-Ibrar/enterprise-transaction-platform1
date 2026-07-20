@@ -1,5 +1,6 @@
 package com.enterprise.api;
 
+import com.enterprise.audit.UserActivityLogService;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.Role;
 import com.enterprise.identity.RoleRepository;
@@ -7,6 +8,7 @@ import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
 import com.enterprise.tenant.TenantRepository;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -28,42 +30,57 @@ public class AdminUserController {
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
     private final TenantRepository tenantRepository;
+    private final UserActivityLogService activityLogService;
 
     public AdminUserController(UserRepository userRepository,
                                RoleRepository roleRepository,
                                NotificationService notificationService,
                                PasswordEncoder passwordEncoder,
-                               TenantRepository tenantRepository) {
+                               TenantRepository tenantRepository,
+                               UserActivityLogService activityLogService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.notificationService = notificationService;
         this.passwordEncoder = passwordEncoder;
         this.tenantRepository = tenantRepository;
+        this.activityLogService = activityLogService;
     }
 
-    // ----- List all users with search (bypass tenant filter for admin) -----
+    // Helper: get current admin
+    private AppUser getCurrentAdmin(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    // List users
     @GetMapping
     public String listUsers(@RequestParam(required = false) String search,
                             @RequestParam(required = false) String role,
-                            Model model) {
-        // Get all users (admin sees everyone)
-        List<AppUser> users = userRepository.findAllWithoutTenantFilter();
+                            Model model,
+                            Authentication authentication) {
 
-        // Filter by search
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
+        List<AppUser> users;
+        if (isSuperAdmin) {
+            users = userRepository.findAllWithoutTenantFilter();
+        } else {
+            users = userRepository.findAll();
+        }
+
         if (search != null && !search.isEmpty()) {
             String lowerSearch = search.toLowerCase();
             users = users.stream()
                     .filter(u -> u.getEmail().toLowerCase().contains(lowerSearch))
                     .collect(Collectors.toList());
         }
-        // Filter by role
         if (role != null && !role.isEmpty()) {
             users = users.stream()
                     .filter(u -> u.getRoles().stream().anyMatch(r -> r.getName().equals(role)))
                     .collect(Collectors.toList());
         }
 
-        // Set tenant name for each user
         for (AppUser user : users) {
             if (user.getTenantId() != null) {
                 tenantRepository.findById(user.getTenantId())
@@ -77,38 +94,50 @@ public class AdminUserController {
         model.addAttribute("search", search);
         model.addAttribute("selectedRole", role);
         model.addAttribute("allRoles", roleRepository.findAll());
+        model.addAttribute("isSuperAdmin", isSuperAdmin);
         return "admin/users/list";
     }
 
-    // ----- Show create user form -----
     @GetMapping("/create")
-    public String showCreateForm(Model model) {
+    public String showCreateForm(Model model, Authentication authentication) {
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         model.addAttribute("user", new AppUser());
         model.addAttribute("allRoles", roleRepository.findAll());
-        model.addAttribute("allTenants", tenantRepository.findAll());
+        model.addAttribute("allTenants", isSuperAdmin ? tenantRepository.findAll() : List.of());
+        model.addAttribute("currentTenant", isSuperAdmin ? null : tenantRepository.findById(admin.getTenantId()).orElse(null));
+        model.addAttribute("isSuperAdmin", isSuperAdmin);
         return "admin/users/create";
     }
 
-    // ----- Create new user (tenantId optional, falls back to 1) -----
     @PostMapping
     public String createUser(@RequestParam String email,
                              @RequestParam String password,
                              @RequestParam(required = false) List<Long> roleIds,
                              @RequestParam(required = false) Long tenantId,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
+
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         if (userRepository.findByEmail(email).isPresent()) {
             redirectAttributes.addFlashAttribute("error", "User with this email already exists.");
             return "redirect:/admin/users/create";
         }
+
         AppUser user = new AppUser();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setActive(true);
 
-        if (tenantId == null) {
-            tenantId = 1L;
+        if (isSuperAdmin) {
+            if (tenantId == null) tenantId = 1L;
+            user.setTenantId(tenantId);
+        } else {
+            user.setTenantId(admin.getTenantId());
         }
-        user.setTenantId(tenantId);
 
         if (roleIds != null && !roleIds.isEmpty()) {
             Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
@@ -121,44 +150,70 @@ public class AdminUserController {
 
         userRepository.save(user);
 
+        // Log activity
+        activityLogService.logActivity(
+                user.getId(),
+                "ACCOUNT_CREATED",
+                "Account created by admin: " + admin.getEmail(),
+                null
+        );
+
         notificationService.createNotification(
-            user.getId(),
-            "ACCOUNT_CREATED",
-            "Account Created",
-            "An administrator has created your account. You can log in with your email and the password provided.",
-            "/login"
+                user.getId(),
+                "ACCOUNT_CREATED",
+                "Account Created",
+                "An administrator has created your account. You can log in with your email and the password provided.",
+                "/login"
         );
 
         redirectAttributes.addFlashAttribute("success", "User created successfully.");
         return "redirect:/admin/users";
     }
 
-    // ----- Show edit user form (roles + status + tenant) -----
     @GetMapping("/{id}/edit")
-    public String showEditForm(@PathVariable Long id, Model model) {
+    public String showEditForm(@PathVariable Long id, Model model, Authentication authentication) {
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!isSuperAdmin && !user.getTenantId().equals(admin.getTenantId())) {
+            throw new RuntimeException("You cannot edit users from other tenants.");
+        }
+
         model.addAttribute("user", user);
         model.addAttribute("allRoles", roleRepository.findAll());
-        model.addAttribute("allTenants", tenantRepository.findAll());
         model.addAttribute("userRoleIds", user.getRoles().stream().map(Role::getId).collect(Collectors.toList()));
+        model.addAttribute("allTenants", isSuperAdmin ? tenantRepository.findAll() : List.of());
+        model.addAttribute("isSuperAdmin", isSuperAdmin);
         return "admin/users/edit";
     }
 
-    // ----- Update user roles, active status, and tenant -----
     @PostMapping("/{id}")
     public String updateUser(@PathVariable Long id,
                              @RequestParam(required = false) List<Long> roleIds,
                              @RequestParam(required = false) Boolean active,
                              @RequestParam(required = false) Long tenantId,
+                             Authentication authentication,
                              RedirectAttributes redirectAttributes) {
+
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (tenantId == null) {
-            tenantId = user.getTenantId();
+        if (!isSuperAdmin && !user.getTenantId().equals(admin.getTenantId())) {
+            throw new RuntimeException("You cannot edit users from other tenants.");
         }
-        user.setTenantId(tenantId);
+
+        // Capture old roles for audit
+        Set<Role> oldRoles = new HashSet<>(user.getRoles());
+
+        if (isSuperAdmin && tenantId != null) {
+            user.setTenantId(tenantId);
+        }
 
         if (roleIds != null && !roleIds.isEmpty()) {
             Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
@@ -174,21 +229,46 @@ public class AdminUserController {
             user.setActive(active);
             if (!active) {
                 notificationService.createNotification(
-                    user.getId(),
-                    "ACCOUNT_REVOKED",
-                    "Account Disabled",
-                    "Your account has been disabled by an administrator.",
-                    "/login"
+                        user.getId(),
+                        "ACCOUNT_REVOKED",
+                        "Account Disabled",
+                        "Your account has been disabled by an administrator.",
+                        "/login"
+                );
+                // Log revoke
+                activityLogService.logActivity(
+                        user.getId(),
+                        "ACCOUNT_REVOKED",
+                        "Account revoked by admin: " + admin.getEmail(),
+                        null
                 );
             } else {
                 notificationService.createNotification(
-                    user.getId(),
-                    "ACCOUNT_RESTORED",
-                    "Account Reactivated",
-                    "Your account has been reactivated by an administrator.",
-                    "/login"
+                        user.getId(),
+                        "ACCOUNT_RESTORED",
+                        "Account Reactivated",
+                        "Your account has been reactivated by an administrator.",
+                        "/login"
+                );
+                // Log restore
+                activityLogService.logActivity(
+                        user.getId(),
+                        "ACCOUNT_RESTORED",
+                        "Account restored by admin: " + admin.getEmail(),
+                        null
                 );
             }
+        }
+
+        // Check role change
+        if (!oldRoles.equals(user.getRoles())) {
+            activityLogService.logActivity(
+                    user.getId(),
+                    "ROLE_CHANGED",
+                    "Roles changed from " + oldRoles.stream().map(Role::getName).collect(Collectors.joining(", ")) +
+                    " to " + user.getRoles().stream().map(Role::getName).collect(Collectors.joining(", ")),
+                    null
+            );
         }
 
         userRepository.save(user);
@@ -196,80 +276,97 @@ public class AdminUserController {
         return "redirect:/admin/users";
     }
 
-    // ----- Revoke merchant by ID (used by suspicious page) -----
     @PostMapping("/revoke/{userId}")
     @ResponseBody
-    public String revokeUserById(@PathVariable Long userId) {
+    public String revokeUserById(@PathVariable Long userId, Authentication authentication) {
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!isSuperAdmin && !user.getTenantId().equals(admin.getTenantId())) {
+            return "You cannot revoke users from other tenants.";
+        }
+
         user.setActive(false);
         userRepository.save(user);
 
         notificationService.createNotification(
-            user.getId(),
-            "ACCOUNT_REVOKED",
-            "Account Revoked",
-            "Your merchant account has been revoked by an administrator.",
-            "/login"
+                user.getId(),
+                "ACCOUNT_REVOKED",
+                "Account Revoked",
+                "Your merchant account has been revoked by an administrator.",
+                "/login"
         );
-
+        activityLogService.logActivity(
+                user.getId(),
+                "ACCOUNT_REVOKED",
+                "Account revoked by admin: " + admin.getEmail(),
+                null
+        );
         return "Merchant account revoked.";
     }
 
-    // ----- Revoke customer by email (for backward compatibility) -----
-    @PostMapping("/revoke")
-    @ResponseBody
-    public String revokeUserByEmail(@RequestParam String email) {
-        AppUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setActive(false);
-        userRepository.save(user);
-
-        notificationService.createNotification(
-            user.getId(),
-            "ACCOUNT_REVOKED",
-            "Account Revoked",
-            "Your account has been revoked by an administrator.",
-            "/login"
-        );
-
-        return "User access revoked.";
-    }
-
-    // ----- Restore page: list inactive users -----
     @GetMapping("/restore")
-    public String restorePage(@RequestParam(required = false) String search, Model model) {
+    public String restorePage(@RequestParam(required = false) String search,
+                              Model model,
+                              Authentication authentication) {
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         List<AppUser> inactiveUsers;
-        if (search != null && !search.isEmpty()) {
-            inactiveUsers = userRepository.findAll().stream()
-                    .filter(u -> !u.isActive() && u.getEmail().toLowerCase().contains(search.toLowerCase()))
+        if (isSuperAdmin) {
+            inactiveUsers = userRepository.findAllWithoutTenantFilter().stream()
+                    .filter(u -> !u.isActive())
                     .collect(Collectors.toList());
         } else {
             inactiveUsers = userRepository.findAll().stream()
-                    .filter(u -> !u.isActive())
+                    .filter(u -> !u.isActive() && u.getTenantId().equals(admin.getTenantId()))
+                    .collect(Collectors.toList());
+        }
+
+        if (search != null && !search.isEmpty()) {
+            inactiveUsers = inactiveUsers.stream()
+                    .filter(u -> u.getEmail().toLowerCase().contains(search.toLowerCase()))
                     .collect(Collectors.toList());
         }
         model.addAttribute("users", inactiveUsers);
         model.addAttribute("search", search);
+        model.addAttribute("isSuperAdmin", isSuperAdmin);
         return "admin/users/restore";
     }
 
-    // ----- Restore a user (set active = true) -----
     @PostMapping("/{id}/restore")
-    public String restoreUser(@PathVariable Long id, @RequestParam(required = false) String search) {
+    public String restoreUser(@PathVariable Long id,
+                              @RequestParam(required = false) String search,
+                              Authentication authentication) {
+        AppUser admin = getCurrentAdmin(authentication);
+        boolean isSuperAdmin = admin.isSuperAdmin();
+
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!isSuperAdmin && !user.getTenantId().equals(admin.getTenantId())) {
+            throw new RuntimeException("You cannot restore users from other tenants.");
+        }
+
         user.setActive(true);
         userRepository.save(user);
 
         notificationService.createNotification(
-            user.getId(),
-            "ACCOUNT_RESTORED",
-            "Account Restored",
-            "Your account has been reactivated by an administrator.",
-            "/login"
+                user.getId(),
+                "ACCOUNT_RESTORED",
+                "Account Restored",
+                "Your account has been reactivated by an administrator.",
+                "/login"
         );
-
+        activityLogService.logActivity(
+                user.getId(),
+                "ACCOUNT_RESTORED",
+                "Account restored by admin: " + admin.getEmail(),
+                null
+        );
         return "redirect:/admin/users/restore" + (search != null ? "?search=" + search : "");
     }
 }

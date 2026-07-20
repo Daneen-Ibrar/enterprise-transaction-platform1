@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Locked Users</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔒 Locked Users</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+
+    <div th:if="${lockedUsers.empty}" style="padding:20px; text-align:center; color:#888;">
+        No users are currently locked.
+    </div>
+
+    <table th:unless="${lockedUsers.empty}">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Failed Attempts</th>
+                <th>Lock Expiry</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="user : ${lockedUsers}">
+                <td th:text="${user.id}">1</td>
+                <td th:text="${user.email}">user@test.com</td>
+                <td th:text="${user.failedLoginAttempts}">5</td>
+                <td th:text="${user.lockExpiry}">2026-01-01 12:00</td>
+                <td>
+                    <form method="post" th:action="@{/admin/locks/unlock}">
+                        <input type="hidden" name="userId" th:value="${user.id}"/>
+                        <button type="submit" class="btn btn-primary">Unlock</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

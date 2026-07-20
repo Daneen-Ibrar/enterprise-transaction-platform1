@@ -68,6 +68,7 @@ public class PublicPaymentController {
                 return "payment/error";
             }
 
+            // ----- FIX: Check if customer exists and is active -----
             AppUser customer = userRepository.findByEmail(invoice.getCustomerEmail())
                     .orElseGet(() -> {
                         AppUser newUser = new AppUser();
@@ -76,8 +77,16 @@ public class PublicPaymentController {
                         Role customerRole = roleRepository.findByName("CUSTOMER")
                                 .orElseThrow(() -> new RuntimeException("CUSTOMER role not found"));
                         newUser.setRoles(Set.of(customerRole));
+                        newUser.setActive(true);
+                        newUser.setTenantId(1L); // default tenant
                         return userRepository.save(newUser);
                     });
+
+            // Check if the customer account is active
+            if (!customer.isActive()) {
+                model.addAttribute("error", "Your account has been disabled. Please contact support.");
+                return "payment/error";
+            }
 
             PaymentRequest request = new PaymentRequest();
             request.setInvoiceId(invoiceId);
@@ -87,7 +96,7 @@ public class PublicPaymentController {
 
             PaymentResponse response = transactionService.processPayment(request, idempotencyKey);
 
-            // ✅ Mark invoice as PAID after successful settlement
+            // Mark invoice as PAID after successful settlement
             if ("SETTLED".equals(response.getStatus())) {
                 invoiceService.markAsPaid(invoiceId, response.getTransactionId());
             }

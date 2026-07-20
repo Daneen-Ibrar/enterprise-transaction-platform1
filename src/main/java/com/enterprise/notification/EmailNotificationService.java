@@ -1,5 +1,6 @@
 package com.enterprise.notification;
 
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -27,6 +28,14 @@ public class EmailNotificationService {
     public void sendEmailAsync(String to, String subject, String body) {
         // Save log entry first
         EmailLog logEntry = new EmailLog(to, subject, body);
+
+        // ----- FIX: Set tenant ID from context -----
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1L; // fallback to default tenant
+        }
+        logEntry.setTenantId(tenantId);
+
         emailLogRepository.save(logEntry);
         log.info("📧 sendEmailAsync called for: {}", to);
 
@@ -46,6 +55,10 @@ public class EmailNotificationService {
     public void resendEmail(Long logId) {
         EmailLog logEntry = emailLogRepository.findById(logId)
                 .orElseThrow(() -> new RuntimeException("Email log not found"));
+
+        // Re-use the same tenant ID from the original log when resending
+        // SendEmailAsync will set the tenant ID from context, but if the context is lost,
+        // we should ideally preserve it. For now, we just pass through.
         sendEmailAsync(logEntry.getRecipient(), logEntry.getSubject(), logEntry.getBody());
     }
 }

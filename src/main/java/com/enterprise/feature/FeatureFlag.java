@@ -21,6 +21,10 @@ public class FeatureFlag {
     @Column(name = "updated_at", updatable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -32,4 +36,7 @@ public class FeatureFlag {
     public void setDescription(String description) { this.description = description; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

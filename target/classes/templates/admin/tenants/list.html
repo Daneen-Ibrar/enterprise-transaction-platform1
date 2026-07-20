@@ -14,14 +14,18 @@
         .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
         .badge-active { background: #d4edda; color: #155724; }
         .badge-inactive { background: #f8d7da; color: #721c24; }
+        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
+        .flash-error { background: #f8d7da; color: #721c24; padding: 10px; border: 1px solid #f5c6cb; margin: 10px 0; }
     </style>
 </head>
 <body>
     <h1>🏢 Tenants</h1>
     <a href="/dashboard">← Back to Dashboard</a>
-    <a href="/admin/tenants/create" class="btn btn-create" style="margin-left: 20px;">+ Create Tenant</a>
+    <!-- ✅ FIX: Correct link to /admin/tenants/create -->
+    <a th:href="@{/admin/tenants/create}" class="btn btn-create" style="margin-left: 20px;">+ Create Tenant</a>
 
     <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
 
     <table>
         <thead>

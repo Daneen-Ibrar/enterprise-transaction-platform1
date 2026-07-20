@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Suspicion Rule</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; }
+        input, select { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
+        textarea { width: 100%; max-width: 500px; padding: 8px; box-sizing: border-box; font-family: monospace; }
+        button { padding: 8px 20px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1e5c2a; }
+        .field-group { margin-bottom: 15px; }
+        .help-text { font-size: 0.8em; color: #666; margin-top: 3px; }
+        .checkbox-group { margin: 10px 0; }
+        .checkbox-group label { display: inline; font-weight: normal; }
+    </style>
+</head>
+<body>
+    <h1>✏️ Edit Suspicion Rule</h1>
+    <a href="/admin/suspicion-rules">← Back to Rules</a>
+
+    <form method="post" th:action="@{/admin/suspicion-rules/{id}(id=${rule.id})}">
+        <div class="field-group">
+            <label for="keyword">Keyword (optional, to auto-generate SpEL):</label>
+            <input type="text" id="keyword" name="keyword" placeholder="e.g., urgent" />
+            <div class="help-text">If provided, this will overwrite the current condition expression.</div>
+        </div>
+
+        <div class="field-group">
+            <label for="conditionExpression">Condition (SpEL) – edit directly if advanced:</label>
+            <textarea id="conditionExpression" name="conditionExpression" rows="3" th:text="${rule.conditionExpression}"></textarea>
+            <div class="help-text">You can either use the keyword above or edit this SpEL directly.</div>
+        </div>
+
+        <div class="field-group">
+            <label for="riskLevel">Risk Level:</label>
+            <select id="riskLevel" name="riskLevel" required>
+                <option value="YELLOW" th:selected="${rule.riskLevel == 'YELLOW'}">🟡 YELLOW</option>
+                <option value="RED" th:selected="${rule.riskLevel == 'RED'}">🔴 RED</option>
+            </select>
+        </div>
+
+        <div class="field-group">
+            <label for="description">Description:</label>
+            <input type="text" id="description" name="description" th:value="${rule.description}" />
+        </div>
+
+        <div class="checkbox-group">
+            <label>
+                <input type="checkbox" name="active" value="true" th:checked="${rule.active}" />
+                Active
+            </label>
+        </div>
+
+        <button type="submit">Update Rule</button>
+    </form>
+</body>
+</html>

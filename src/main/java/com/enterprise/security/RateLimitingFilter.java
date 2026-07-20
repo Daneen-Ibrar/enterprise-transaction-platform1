@@ -9,48 +9,62 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-    private static final int MAX_REQUESTS = 100; // per minute
-    private static final long TIME_WINDOW = 60000; // 1 minute
+    private final RateLimitService rateLimitService;
 
-    private final ConcurrentHashMap<String, RateLimitInfo> requestCounts = new ConcurrentHashMap<>();
+    public RateLimitingFilter(RateLimitService rateLimitService) {
+        this.rateLimitService = rateLimitService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        String apiKey = request.getHeader("X-API-Key");
-        if (apiKey == null) {
+        // Only apply to API endpoints
+        String path = request.getRequestURI();
+        if (!path.startsWith("/api/")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        RateLimitInfo info = requestCounts.computeIfAbsent(apiKey, k -> new RateLimitInfo());
-        synchronized (info) {
-            long now = System.currentTimeMillis();
-            if (now - info.lastReset > TIME_WINDOW) {
-                info.count.set(0);
-                info.lastReset = now;
-            }
-            if (info.count.incrementAndGet() > MAX_REQUESTS) {
-                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                response.getWriter().write("{\"error\":\"Rate limit exceeded\",\"message\":\"Maximum 100 requests per minute\"}");
-                response.setContentType("application/json");
-                return;
-            }
+        String apiKey = request.getHeader("X-API-Key");
+        if (apiKey == null || apiKey.isEmpty()) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        filterChain.doFilter(request, response);
-    }
+        // Determine rate limit type based on HTTP method
+        RateLimitService.RateLimitType type = "POST".equalsIgnoreCase(request.getMethod()) &&
+                path.contains("/payments") ?
+                RateLimitService.RateLimitType.PAYMENT :
+                RateLimitService.RateLimitType.READ;
 
-    private static class RateLimitInfo {
-        private final AtomicInteger count = new AtomicInteger(0);
-        private long lastReset = System.currentTimeMillis();
+        boolean allowed = rateLimitService.isAllowed(apiKey, type);
+
+        if (!allowed) {
+            long remaining = rateLimitService.getRemainingQuota(apiKey, type);
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader("X-RateLimit-Limit", String.valueOf(
+                    type == RateLimitService.RateLimitType.PAYMENT ? 100 : 200
+            ));
+            response.setHeader("X-RateLimit-Remaining", "0");
+            response.setHeader("X-RateLimit-Reset", "60");
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Rate limit exceeded\",\"message\":\"Too many requests\"}");
+            return;
+        }
+
+        // Add rate limit headers to response
+        long remaining = rateLimitService.getRemainingQuota(apiKey, type);
+        response.setHeader("X-RateLimit-Limit", String.valueOf(
+                type == RateLimitService.RateLimitType.PAYMENT ? 100 : 200
+        ));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(remaining));
+
+        filterChain.doFilter(request, response);
     }
 }

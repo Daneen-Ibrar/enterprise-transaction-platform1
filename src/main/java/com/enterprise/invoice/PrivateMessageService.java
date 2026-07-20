@@ -2,6 +2,7 @@ package com.enterprise.invoice;
 
 import com.enterprise.identity.AppUser;
 import com.enterprise.notification.NotificationService;
+import com.enterprise.tenant.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,11 @@ public class PrivateMessageService {
     @Transactional
     public PrivateMessage sendPrivateMessage(Invoice invoice, AppUser sender, AppUser recipient, String message) {
         PrivateMessage pm = new PrivateMessage(invoice, sender, recipient, message);
+
+        // ----- FIX: Set tenant ID -----
+        Long tenantId = TenantContext.getTenantId();
+        pm.setTenantId(tenantId != null ? tenantId : 1L);
+
         pm = privateMessageRepository.save(pm);
 
         notificationService.createNotification(

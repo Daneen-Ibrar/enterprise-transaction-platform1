@@ -2,42 +2,124 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Pending Approvals</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-success { background: #2d7a3a; color: white; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .bulk-bar { margin: 15px 0; padding: 15px; background: #f5f5f5; border-radius: 4px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .bulk-bar select, .bulk-bar button { padding: 6px 12px; }
+        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
+        .flash-error { background: #f8d7da; color: #721c24; padding: 10px; border: 1px solid #f5c6cb; margin: 10px 0; }
+    </style>
 </head>
 <body>
     <h1>Pending Invoices for Approval</h1>
     <a href="/dashboard">← Back to Dashboard</a>
 
-    <table border="1" cellpadding="8">
+    <!-- Flash messages -->
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+
+    <!-- Bulk Action Form -->
+    <div class="bulk-bar">
+        <span><strong>Bulk Actions:</strong></span>
+        <form method="post" id="bulkForm" th:action="@{/admin/invoices/bulk/approve}" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="bulkAction" name="bulkAction">
+                <option value="">Select Action</option>
+                <option value="approve">Bulk Approve</option>
+                <option value="reject">Bulk Reject</option>
+            </select>
+            <button type="submit" class="btn btn-primary" onclick="return confirmBulk()">Apply to Selected</button>
+            <span style="font-size: 0.9em; color: #888;">(Select invoices below)</span>
+        </form>
+    </div>
+
+    <!-- Table with individual action buttons -->
+    <table>
         <thead>
             <tr>
+                <th><input type="checkbox" id="selectAll" onclick="toggleAll()"/></th>
                 <th>ID</th>
                 <th>Amount</th>
                 <th>Description</th>
                 <th>Customer</th>
                 <th>Merchant</th>
+                <th>Risk</th>
                 <th>Action</th>
+                <th>Chat</th>
             </tr>
         </thead>
         <tbody>
             <tr th:each="inv : ${invoices}">
+                <td><input type="checkbox" name="ids" th:value="${inv.id}"/></td>
                 <td th:text="${inv.id}">1</td>
                 <td th:text="${inv.amount}">100.00</td>
-                <td th:text="${inv.description}">Test</td>
+                <td th:text="${inv.description}">Description</td>
                 <td th:text="${inv.customerEmail}">customer@test.com</td>
                 <td th:text="${inv.merchantId}">2</td>
+                <td th:text="${inv.riskLevel}">GREEN</td>
                 <td>
+                    <!-- Single Approve Button -->
                     <form method="post" th:action="@{/admin/invoices/{id}/approve(id=${inv.id})}" style="display:inline;">
-                        <button type="submit">Approve</button>
+                        <button type="submit" class="btn btn-success">Approve</button>
                     </form>
+                    <!-- Single Reject Button -->
                     <form method="post" th:action="@{/admin/invoices/{id}/reject(id=${inv.id})}" style="display:inline;">
-                        <button type="submit">Reject</button>
+                        <button type="submit" class="btn btn-danger">Reject</button>
                     </form>
                 </td>
                 <td>
-    <a th:href="@{/admin/invoices/{id}/messages(id=${inv.id})}">💬 Chat</a>
-</td>
+                    <a th:href="@{/admin/invoices/{id}/messages(id=${inv.id})}" class="btn btn-primary">💬</a>
+                </td>
+            </tr>
+            <tr th:if="${invoices.empty}">
+                <td colspan="9">No pending invoices.</td>
             </tr>
         </tbody>
     </table>
+
+    <script>
+        function toggleAll() {
+            var checkboxes = document.getElementsByName('ids');
+            var selectAll = document.getElementById('selectAll');
+            for (var cb of checkboxes) {
+                cb.checked = selectAll.checked;
+            }
+        }
+
+        function confirmBulk() {
+            var action = document.getElementById('bulkAction').value;
+            if (!action) {
+                alert('Please select an action.');
+                return false;
+            }
+            var checked = document.querySelectorAll('input[name="ids"]:checked');
+            if (checked.length === 0) {
+                alert('Please select at least one invoice.');
+                return false;
+            }
+            var msg = 'Are you sure you want to ' + action + ' ' + checked.length + ' invoice(s)?';
+            return confirm(msg);
+        }
+
+        // ⚠️ IMPORTANT: This ONLY applies to the bulk form
+        document.getElementById('bulkForm').addEventListener('submit', function(e) {
+            var action = document.getElementById('bulkAction').value;
+            if (action === 'approve') {
+                this.action = '/admin/invoices/bulk/approve';
+            } else if (action === 'reject') {
+                this.action = '/admin/invoices/bulk/reject';
+            } else {
+                e.preventDefault();
+                alert('Please select a valid action.');
+            }
+        });
+    </script>
 </body>
 </html>

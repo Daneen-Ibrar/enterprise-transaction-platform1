@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Create Suspicion Rule</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; }
+        input, select { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
+        button { padding: 8px 20px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1e5c2a; }
+        .field-group { margin-bottom: 15px; }
+        .help-text { font-size: 0.8em; color: #666; margin-top: 3px; }
+    </style>
+</head>
+<body>
+    <h1>➕ Create Suspicion Rule</h1>
+    <a href="/admin/suspicion-rules">← Back to Rules</a>
+
+    <form method="post" th:action="@{/admin/suspicion-rules}">
+        <div class="field-group">
+            <label for="keyword">Keyword or Phrase:</label>
+            <input type="text" id="keyword" name="keyword" placeholder="e.g., urgent, fraud, scam" required />
+            <div class="help-text">This will be converted to a SpEL condition: <code>#description.toLowerCase().contains("keyword")</code></div>
+        </div>
+
+        <div class="field-group">
+            <label for="riskLevel">Risk Level:</label>
+            <select id="riskLevel" name="riskLevel" required>
+                <option value="YELLOW">🟡 YELLOW</option>
+                <option value="RED">🔴 RED</option>
+            </select>
+        </div>
+
+        <div class="field-group">
+            <label for="description">Description (optional):</label>
+            <input type="text" id="description" name="description" placeholder="e.g., Invoices containing 'fraud' get RED risk" />
+        </div>
+
+        <button type="submit">Create Rule</button>
+    </form>
+</body>
+</html>

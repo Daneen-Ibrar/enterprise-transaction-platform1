@@ -42,16 +42,20 @@ public class Invoice {
     private LocalDateTime updatedAt;
 
     @Column(name = "risk_level")
-private String riskLevel = "GREEN";
+    private String riskLevel = "GREEN";
 
-@Column(name = "suspicion_reason", columnDefinition = "TEXT")
-private String suspicionReason;
+    @Column(name = "suspicion_reason", columnDefinition = "TEXT")
+    private String suspicionReason;
 
-public String getRiskLevel() { return riskLevel; }
-public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
-public String getSuspicionReason() { return suspicionReason; }
-public void setSuspicionReason(String suspicionReason) { this.suspicionReason = suspicionReason; }
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+@Version
+@Column(name = "version", nullable = false)
+private Long version = 0L;
 
+public Long getVersion() { return version; }
+public void setVersion(Long version) { this.version = version; }
     // Constructors
     public Invoice() {}
 
@@ -93,4 +97,13 @@ public void setSuspicionReason(String suspicionReason) { this.suspicionReason = 
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getRiskLevel() { return riskLevel; }
+    public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+
+    public String getSuspicionReason() { return suspicionReason; }
+    public void setSuspicionReason(String suspicionReason) { this.suspicionReason = suspicionReason; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

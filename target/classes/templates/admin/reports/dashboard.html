@@ -9,6 +9,14 @@
         .col { flex: 1; min-width: 300px; }
         .card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin: 10px; background: #f9f9f9; }
         .chart-container { position: relative; height: 200px; width: 100%; }
+        .metric-card { text-align: center; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #ddd; flex: 1; min-width: 150px; }
+        .metric-card .number { font-size: 2em; font-weight: bold; color: #2d7a3a; }
+        .filter-bar { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin: 20px 0; }
+        .filter-bar input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .filter-bar button { padding: 6px 15px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .filter-bar button:hover { background: #1e5c2a; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; background: #3498db; color: white; }
+        .btn:hover { opacity: 0.8; }
         h3 { margin-top: 0; }
     </style>
 </head>
@@ -16,10 +24,45 @@
     <h1>📊 Reports Dashboard</h1>
     <a href="/dashboard">← Back to Dashboard</a>
 
+    <!-- Date Filter -->
+    <div class="filter-bar">
+        <form method="get" th:action="@{/admin/reports}">
+            <label>From:
+                <input type="date" name="startDate" th:value="${startDate}" />
+            </label>
+            <label>To:
+                <input type="date" name="endDate" th:value="${endDate}" />
+            </label>
+            <button type="submit">Apply</button>
+            <a th:href="@{/admin/reports}" style="margin-left:10px;">Reset</a>
+        </form>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="row" style="margin-bottom:20px;">
+        <div class="metric-card">
+            <div>Total Transactions</div>
+            <div class="number" th:text="${summary.totalTransactions}">0</div>
+        </div>
+        <div class="metric-card">
+            <div>Total Volume</div>
+            <div class="number" th:text="${#numbers.formatDecimal(summary.totalVolume, 0, 'COMMA', 2, 'DEFAULT')}">£0.00</div>
+        </div>
+        <div class="metric-card">
+            <div>Average Amount</div>
+            <div class="number" th:text="${#numbers.formatDecimal(summary.average, 0, 'COMMA', 2, 'DEFAULT')}">£0.00</div>
+        </div>
+        <div class="metric-card">
+            <div>Success Rate</div>
+            <div class="number" th:text="${#numbers.formatDecimal(summary.successRate, 0, 'COMMA', 1, 'DEFAULT')} + '%'">0%</div>
+        </div>
+    </div>
+
+    <!-- Row 1: Volume & Average -->
     <div class="row">
         <div class="col">
             <div class="card">
-                <h3>Transaction Volume (Last 30 Days)</h3>
+                <h3>Transaction Volume</h3>
                 <div class="chart-container">
                     <canvas id="volumeChart"></canvas>
                 </div>
@@ -35,24 +78,45 @@
         </div>
     </div>
 
+    <!-- Row 2: Status Distribution & Top Merchants Bar -->
     <div class="row">
         <div class="col">
             <div class="card">
-                <h3>Payment Success Rate</h3>
+                <h3>Status Distribution</h3>
                 <div class="chart-container">
-                    <canvas id="successChart"></canvas>
+                    <canvas id="statusChart"></canvas>
                 </div>
             </div>
         </div>
         <div class="col">
             <div class="card">
                 <h3>Top Merchants by Volume</h3>
+                <div class="chart-container">
+                    <canvas id="merchantChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: Daily Success Rate & Table -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <h3>Daily Success Rate (%)</h3>
+                <div class="chart-container">
+                    <canvas id="successRateChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card">
+                <h3>Top Merchants (Table)</h3>
                 <table border="1" cellpadding="8" style="width:100%;">
                     <thead><tr><th>Merchant ID</th><th>Total Amount</th></tr></thead>
                     <tbody>
                         <tr th:each="m : ${topMerchants}">
                             <td th:text="${m.merchantId}">1</td>
-                            <td th:text="${m.totalAmount}">1000.00</td>
+                            <td th:text="${#numbers.formatDecimal(m.totalAmount, 0, 'COMMA', 2, 'DEFAULT')}">£0.00</td>
                         </tr>
                     </tbody>
                 </table>
@@ -60,25 +124,26 @@
         </div>
     </div>
 
-    <div class="row">
-        <div class="col">
-            <div class="card">
-                <h3>Export Data</h3>
-                <a th:href="@{/admin/reports/data/transactions/csv}" class="btn">Download CSV</a>
-            </div>
-        </div>
+    <!-- Export Buttons -->
+    <div style="margin-top: 30px;">
+        <a th:href="@{/admin/reports/data/transactions/csv(startDate=${startDate}, endDate=${endDate})}" class="btn">Download CSV</a>
+        <a th:href="@{/admin/reports/export/pdf(startDate=${startDate}, endDate=${endDate})}" class="btn" style="background: #c0392b;">Download PDF</a>
+        <a th:href="@{/admin/reports/export/excel(startDate=${startDate}, endDate=${endDate})}" class="btn" style="background: #2980b9;">Download Excel</a>
     </div>
 
     <script th:inline="javascript">
         /*<![CDATA[*/
         document.addEventListener('DOMContentLoaded', function() {
-            // Safely parse data from Thymeleaf
             const labels = /*[[${labels}]]*/ [];
             const volumeData = /*[[${volumeData}]]*/ [];
             const avgData = /*[[${avgData}]]*/ [];
-            const successRate = /*[[${successRate}]]*/ { success: 0, failed: 0 };
+            const statusLabels = /*[[${statusLabels}]]*/ [];
+            const statusValues = /*[[${statusValues}]]*/ [];
+            const merchantLabels = /*[[${merchantLabels}]]*/ [];
+            const merchantValues = /*[[${merchantValues}]]*/ [];
+            const successRateData = /*[[${successRateData}]]*/ [];
 
-            // Volume Chart (Bar)
+            // Volume Chart
             const ctx1 = document.getElementById('volumeChart').getContext('2d');
             new Chart(ctx1, {
                 type: 'bar',
@@ -101,7 +166,7 @@
                 }
             });
 
-            // Average Amount Chart (Line)
+            // Average Amount Chart
             const ctx2 = document.getElementById('avgChart').getContext('2d');
             new Chart(ctx2, {
                 type: 'line',
@@ -125,15 +190,15 @@
                 }
             });
 
-            // Success Rate (Donut)
-            const ctx3 = document.getElementById('successChart').getContext('2d');
+            // Status Distribution (Pie)
+            const ctx3 = document.getElementById('statusChart').getContext('2d');
             new Chart(ctx3, {
-                type: 'doughnut',
+                type: 'pie',
                 data: {
-                    labels: ['Successful', 'Failed'],
+                    labels: statusLabels,
                     datasets: [{
-                        data: [successRate.success || 0, successRate.failed || 0],
-                        backgroundColor: ['#2d7a3a', '#c0392b']
+                        data: statusValues,
+                        backgroundColor: ['#2d7a3a', '#c0392b', '#f39c12', '#2980b9', '#8e44ad']
                     }]
                 },
                 options: {
@@ -141,6 +206,57 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // Top Merchants Bar
+            const ctx4 = document.getElementById('merchantChart').getContext('2d');
+            new Chart(ctx4, {
+                type: 'bar',
+                data: {
+                    labels: merchantLabels,
+                    datasets: [{
+                        label: 'Total Volume (£)',
+                        data: merchantValues,
+                        backgroundColor: 'rgba(255, 159, 64, 0.5)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            // Daily Success Rate Trend
+            const ctx5 = document.getElementById('successRateChart').getContext('2d');
+            new Chart(ctx5, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Success Rate (%)',
+                        data: successRateData,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
                     }
                 }
             });

@@ -3,29 +3,53 @@
 <head>
     <title>Login</title>
     <style>
-        .error-box { color: red; padding: 10px; border: 1px solid red; background: #ffeeee; margin: 10px 0; }
-        .success-box { color: green; padding: 10px; border: 1px solid green; background: #eeffee; margin: 10px 0; }
-        label { display: block; margin: 5px 0; }
-        input { padding: 5px; width: 200px; }
-        button { padding: 5px 15px; }
+        .error-box {
+            color: red;
+            padding: 10px;
+            border: 1px solid red;
+            background: #ffeeee;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success-box {
+            color: green;
+            padding: 10px;
+            border: 1px solid green;
+            background: #eeffee;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+        input {
+            padding: 5px;
+            width: 200px;
+        }
+        button {
+            padding: 5px 15px;
+            background: #2d7a3a;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1e5c2a;
+        }
     </style>
 </head>
 <body>
     <h1>Login</h1>
 
-    <!-- Show custom error message if present -->
+    <!-- Any error message if error parameter is present -->
     <div th:if="${param.error != null}" class="error-box">
-        <p th:text="${session.SPRING_SECURITY_LAST_EXCEPTION != null ? session.SPRING_SECURITY_LAST_EXCEPTION.message : 'Invalid credentials'}">
-            Invalid credentials
-        </p>
+        <p th:if="${param.error[0] == 'disabled'}">Your account has been disabled by an administrator.</p>
+        <p th:if="${param.error[0] == 'locked'}">Your account has been locked due to too many failed login attempts. Please try again later or contact support.</p>
+        <p th:if="${param.error[0] != 'disabled' and param.error[0] != 'locked'}">Invalid username or password. Please try again.</p>
     </div>
 
-    <!-- Show disabled message if redirected from filter -->
-    <div th:if="${param.error == 'disabled'}" class="error-box">
-        <p>Your account has been disabled by an administrator.</p>
-    </div>
-
-    <!-- Show logout message if present -->
     <div th:if="${param.logout != null}" class="success-box">
         <p>You have been logged out.</p>
     </div>
