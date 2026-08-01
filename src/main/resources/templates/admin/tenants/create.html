@@ -3,43 +3,48 @@
 <head>
     <title>Create Tenant</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        label { display: block; margin: 10px 0 5px; font-weight: bold; }
-        input { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
-        textarea { width: 100%; max-width: 400px; padding: 8px; box-sizing: border-box; }
-        button { padding: 8px 20px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #1e5c2a; }
-        .checkbox-group { margin: 10px 0; }
-        .checkbox-group label { display: inline; font-weight: normal; }
-        .error { color: red; margin: 10px 0; }
-        .field-group { margin-bottom: 15px; }
+        /* (same styles as before) */
     </style>
 </head>
 <body>
-    <h1>🏢 Create Tenant</h1>
-    <a href="/admin/tenants">← Back to Tenants</a>
+    <div class="container">
+        <div th:if="${error}" class="error-msg" th:text="${error}"></div>
 
-    <div th:if="${error}" class="error" th:text="${error}"></div>
+        <h1 th:if="${tenant.id == null}">Create Tenant</h1>
+        <h1 th:if="${tenant.id != null}">Edit Tenant</h1>
 
-    <form method="post" th:action="@{/admin/tenants}">
-        <div class="field-group">
-            <label for="name">Tenant Name:</label>
-            <input type="text" id="name" name="name" placeholder="e.g., Acme Corp" required />
-        </div>
+        <form th:action="${tenant.id == null} ? '/admin/tenants' : '/admin/tenants/' + ${tenant.id}" method="post">
+            <input type="hidden" name="id" th:value="${tenant.id}">
 
-        <div class="field-group">
-            <label for="description">Description (optional):</label>
-            <textarea id="description" name="description" rows="3" placeholder="Brief description of this tenant..."></textarea>
-        </div>
+            <div class="form-group">
+                <label>Name <span style="color:red;">*</span></label>
+                <input type="text" name="name" th:value="${tenant.name}" required>
+            </div>
 
-        <div class="checkbox-group">
-            <label>
-                <input type="checkbox" name="active" value="true" checked />
-                Active
-            </label>
-        </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" rows="3" th:text="${tenant.description}"></textarea>
+            </div>
 
-        <button type="submit">Create Tenant</button>
-    </form>
+            <div class="form-group">
+                <label>Base Currency <span style="color:red;">*</span></label>
+                <select name="baseCurrency" required>
+                    <option value="">— Select —</option>
+                    <option th:each="c : ${currencies}" th:value="${c}" th:text="${c}" th:selected="${c == tenant.baseCurrency}"></option>
+                </select>
+                <div class="note">All reports and dashboards will convert amounts to this currency.</div>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="active" th:checked="${tenant.active}">
+                <label>Active</label>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="/admin/tenants" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
 </body>
 </html>

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/audit")   // <-- CHANGE HERE
+@RequestMapping("/api/audit")
 public class AuditController {
 
     private final AuditService auditService;

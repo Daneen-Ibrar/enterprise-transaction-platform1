@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Reconciliation Reports</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        table {
+            width: 100%;
+            background: white;
+            border-collapse: collapse;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th {
+            background: #f9fafb;
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+        tr:hover {
+            background: #f9fafb;
+        }
+        .status-pass {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-fail {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .text-green {
+            color: #16a34a;
+            font-weight: 600;
+        }
+        .text-red {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        .text-blue {
+            color: #2563eb;
+        }
+        .text-blue a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .text-blue a:hover {
+            text-decoration: underline;
+        }
+        .text-gray {
+            color: #6b7280;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .py-4 {
+            padding: 16px 0;
+        }
+        .px-6 {
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Reconciliation Reports</h1>
+        <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Started</th>
+                    <th>Completed</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Matched</th>
+                    <th>Mismatched</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="record : ${records}">
+                    <td th:text="${record.id}">1</td>
+                    <td th:text="${#dates.format(record.startedAt, 'dd/MM/yyyy HH:mm')}">2026-01-01</td>
+                    <td th:text="${#dates.format(record.completedAt, 'dd/MM/yyyy HH:mm')}">2026-01-01</td>
+                    <td>
+                        <span th:class="${record.status == 'PASS'} ? 'status-pass' : 'status-fail'" th:text="${record.status}">PASS</span>
+                    </td>
+                    <td th:text="${record.totalTransactions}">10</td>
+                    <td class="text-green" th:text="${record.matchedTransactions}">10</td>
+                    <td class="text-red" th:text="${record.mismatchedTransactions}">0</td>
+                    <td class="text-blue">
+                        <a th:href="'/admin/reconciliation/' + ${record.id}">View Details</a>
+                    </td>
+                </tr>
+                <tr th:if="${records.empty}">
+                    <td colspan="8" class="text-center text-gray" style="padding: 16px;">No reconciliation runs found.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

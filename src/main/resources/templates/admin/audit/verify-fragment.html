@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <div th:fragment="verify-result">
+        <div th:if="${valid}" class="alert alert-success">
+            ✅ Audit chain is valid (status: <span th:text="${status}">INTEGRITY_VALID</span>)
+        </div>
+        <div th:unless="${valid}" class="alert alert-danger">
+            ❌ Audit chain is broken (status: <span th:text="${status}">INTEGRITY_BROKEN</span>)
+        </div>
+        <small>Checked at: <span th:text="${timestamp}">2026-01-01T00:00:00Z</span></small>
+    </div>
+</body>
+</html>

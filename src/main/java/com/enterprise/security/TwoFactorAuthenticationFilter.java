@@ -30,7 +30,7 @@ public class TwoFactorAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        // ----- FEATURE FLAG CHECK -----
+
         if (!featureFlagService.isEnabled("TWO_FACTOR_AUTH")) {
             filterChain.doFilter(request, response);
             return;
@@ -48,32 +48,36 @@ public class TwoFactorAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        // ----- CHECK 2FA REQUIRED FOR ADMIN -----
+        Boolean required = (Boolean) session.getAttribute("2FA_REQUIRED");
+        if (required != null && required) {
+            String uri = request.getRequestURI();
+            // Allow 2FA pages, logout, and static resources
+            if (uri.startsWith("/2fa/") || uri.startsWith("/logout") || uri.startsWith("/css/") || uri.startsWith("/js/")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            // Otherwise redirect to 2FA setup
+            response.sendRedirect("/2fa/setup?required=true");
+            return;
+        }
+
+        // ----- NORMAL 2FA VERIFICATION -----
         Boolean pending = (Boolean) session.getAttribute("2FA_PENDING");
         Boolean authenticated = (Boolean) session.getAttribute("2FA_AUTHENTICATED");
 
-        // If 2FA is not pending or already verified, proceed
         if (pending == null || !pending || (authenticated != null && authenticated)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         String uri = request.getRequestURI();
-
-        // Allow POST to /2fa/verify to pass through (for both TOTP and backup codes)
-        if (uri.equals("/2fa/verify") && "POST".equalsIgnoreCase(request.getMethod())) {
+        // Allow 2FA pages, logout, static resources
+        if (uri.startsWith("/2fa/") || uri.startsWith("/logout") || uri.startsWith("/css/") || uri.startsWith("/js/")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Public paths (GET only)
-        if (uri.startsWith("/2fa/verify") || uri.startsWith("/2fa/setup") || uri.startsWith("/2fa/enable") ||
-            uri.startsWith("/2fa/disable") || uri.startsWith("/2fa/backup-codes") || 
-            uri.startsWith("/logout") || uri.startsWith("/css/") || uri.startsWith("/js/")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // Otherwise redirect to 2FA verification
         response.sendRedirect("/2fa/verify");
     }
 }

@@ -19,7 +19,6 @@ public class AuditEvent {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    // FIXED: columnDefinition = "TEXT" (was JSONB in code, but migration V4 changed to TEXT)
     @Column(columnDefinition = "TEXT", nullable = false)
     private String details;
 
@@ -32,21 +31,19 @@ public class AuditEvent {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // ----- DIFF FIELDS (TEXT to avoid casting issues) -----
+    // ----- DIFF FIELDS -----
     @Column(name = "entity_type")
     private String entityType;
 
     @Column(name = "entity_id")
     private Long entityId;
 
-    // FIXED: columnDefinition = "TEXT" (was JSONB in code, but migration V29 changed to TEXT)
     @Column(name = "previous_state", columnDefinition = "TEXT")
     private String previousState;
 
     @Column(name = "current_state", columnDefinition = "TEXT")
     private String currentState;
 
-    // ----- TENANT ID -----
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 

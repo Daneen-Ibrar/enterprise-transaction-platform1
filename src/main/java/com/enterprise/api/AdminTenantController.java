@@ -1,13 +1,14 @@
 package com.enterprise.api;
 
+import com.enterprise.currency.CurrencyCodes;
 import com.enterprise.tenant.Tenant;
 import com.enterprise.tenant.TenantRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,37 +34,46 @@ public class AdminTenantController {
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("tenant", new Tenant());
+        model.addAttribute("currencies", CurrencyCodes.getAllCurrencies());
         return "admin/tenants/create";
     }
-@PostMapping
-public String createTenant(@ModelAttribute Tenant tenant, RedirectAttributes redirectAttributes) {
-    try {
-        tenant.setCreatedAt(LocalDateTime.now());
-        tenantRepository.save(tenant);
-        redirectAttributes.addFlashAttribute("success", "Tenant created.");
-    } catch (DataIntegrityViolationException e) {
-        if (e.getMessage().contains("duplicate key")) {
-            redirectAttributes.addFlashAttribute("error", "Tenant with this name already exists or ID conflict.");
-        } else {
-            redirectAttributes.addFlashAttribute("error", "Failed to create tenant: " + e.getMessage());
+
+    @PostMapping
+    public String createTenant(@ModelAttribute Tenant tenant, RedirectAttributes redirectAttributes) {
+        try {
+            tenant.setCreatedAt(LocalDateTime.now());
+            tenant.setBaseCurrency(tenant.getBaseCurrency() != null ? tenant.getBaseCurrency() : "GBP");
+            tenantRepository.save(tenant);
+            redirectAttributes.addFlashAttribute("success", "Tenant created.");
+        } catch (DataIntegrityViolationException e) {
+            if (e.getMessage().contains("duplicate key")) {
+                redirectAttributes.addFlashAttribute("error", "Tenant with this name already exists.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Failed to create tenant: " + e.getMessage());
+            }
         }
+        return "redirect:/admin/tenants";
     }
-    return "redirect:/admin/tenants";
-}
 
     @GetMapping("/{id}/edit")
     public String showEditForm(@PathVariable Long id, Model model) {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
         model.addAttribute("tenant", tenant);
+        model.addAttribute("currencies", CurrencyCodes.getAllCurrencies());
         return "admin/tenants/edit";
     }
 
     @PostMapping("/{id}")
     public String updateTenant(@PathVariable Long id, @ModelAttribute Tenant tenant, RedirectAttributes redirectAttributes) {
-        tenant.setId(id);
-        tenant.setUpdatedAt(LocalDateTime.now());
-        tenantRepository.save(tenant);
+        Tenant existing = tenantRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tenant not found"));
+        existing.setName(tenant.getName());
+        existing.setDescription(tenant.getDescription());
+        existing.setActive(tenant.isActive());
+        existing.setBaseCurrency(tenant.getBaseCurrency() != null ? tenant.getBaseCurrency() : "GBP");
+        existing.setUpdatedAt(LocalDateTime.now());
+        tenantRepository.save(existing);
         redirectAttributes.addFlashAttribute("success", "Tenant updated.");
         return "redirect:/admin/tenants";
     }
@@ -74,5 +84,4 @@ public String createTenant(@ModelAttribute Tenant tenant, RedirectAttributes red
         redirectAttributes.addFlashAttribute("success", "Tenant deleted.");
         return "redirect:/admin/tenants";
     }
-
 }

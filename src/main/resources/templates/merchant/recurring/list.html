@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Recurring Invoices</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .badge { padding: 2px 8px; border-radius: 12px; color: white; }
+        .badge-active { background: #2d7a3a; }
+        .badge-inactive { background: #c0392b; }
+        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-toggle { background: #f39c12; color: white; }
+        .btn-delete { background: #c0392b; color: white; }
+        .btn-create { background: #2d7a3a; color: white; padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <h1>📆 Recurring Invoices</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <div style="margin: 15px 0;">
+        <a href="/merchant/recurring/create" class="btn btn-create">+ New Recurring Schedule</a>
+    </div>
+
+    <div th:if="${success}" style="background: #d4edda; padding: 10px; border-radius: 4px; margin: 10px 0; color: #155724;">
+        <span th:text="${success}">Success</span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Frequency</th>
+                <th>Next Run</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="s : ${schedules}">
+                <td th:text="${s.id}">1</td>
+                <td th:text="${s.customerEmail}">customer@example.com</td>
+                <td th:text="${currencyHelper.getFormattedAmount(s.amount, s.currency)}">£ 100.00</td>
+                <td th:text="${s.frequency}">MONTHLY</td>
+                <td th:text="${s.nextRunDate}">2026-01-01</td>
+                <td>
+                    <span class="badge" th:classappend="${s.active ? 'badge-active' : 'badge-inactive'}"
+                          th:text="${s.active ? 'Active' : 'Inactive'}">Active</span>
+                </td>
+                <td>
+                    <a th:href="@{/merchant/recurring/{id}/edit(id=${s.id})}" class="btn btn-edit">Edit</a>
+                    <form method="post" th:action="@{/merchant/recurring/{id}/toggle(id=${s.id})}" style="display:inline;">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                        <button type="submit" class="btn btn-toggle">Toggle</button>
+                    </form>
+                    <form method="post" th:action="@{/merchant/recurring/{id}/delete(id=${s.id})}" style="display:inline;">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                        <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this schedule?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

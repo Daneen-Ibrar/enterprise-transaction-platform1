@@ -24,9 +24,8 @@ public class PrivateMessageService {
     public PrivateMessage sendPrivateMessage(Invoice invoice, AppUser sender, AppUser recipient, String message) {
         PrivateMessage pm = new PrivateMessage(invoice, sender, recipient, message);
 
-        // ----- FIX: Set tenant ID -----
-        Long tenantId = TenantContext.getTenantId();
-        pm.setTenantId(tenantId != null ? tenantId : 1L);
+        // ✅ FIX: Use required tenant ID – fail closed
+        pm.setTenantId(TenantContext.getRequiredTenantId());
 
         pm = privateMessageRepository.save(pm);
 

@@ -93,8 +93,8 @@ public class AdminRefundRuleController {
             allowRule.setConditionExpression("#amount <= " + threshold);
             allowRule.setAction("ALLOW");
             allowRule.setActive(true);
-            Long tenantId = TenantContext.getTenantId();
-            allowRule.setTenantId(tenantId != null ? tenantId : 1L);
+            // ✅ FIX: Use required tenant ID – fail closed
+            allowRule.setTenantId(TenantContext.getRequiredTenantId());
             allowRule = ruleRepository.save(allowRule);
             ruleAuditService.logChange("REFUND", allowRule.getId(), "CREATE", null, allowRule, admin.getId());
 
@@ -103,7 +103,8 @@ public class AdminRefundRuleController {
             denyRule.setConditionExpression("#amount > " + threshold);
             denyRule.setAction("DENY");
             denyRule.setActive(true);
-            denyRule.setTenantId(tenantId != null ? tenantId : 1L);
+            // ✅ FIX: Use required tenant ID – fail closed
+            denyRule.setTenantId(TenantContext.getRequiredTenantId());
             denyRule = ruleRepository.save(denyRule);
             ruleAuditService.logChange("REFUND", denyRule.getId(), "CREATE", null, denyRule, admin.getId());
 
@@ -130,8 +131,8 @@ public class AdminRefundRuleController {
             AppUser admin = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
 
-            Long tenantId = TenantContext.getTenantId();
-            rule.setTenantId(tenantId != null ? tenantId : 1L);
+            // ✅ FIX: Use required tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             rule.setActive(true);
             RefundRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("REFUND", savedRule.getId(), "CREATE", null, savedRule, admin.getId());
@@ -166,6 +167,8 @@ public class AdminRefundRuleController {
 
             rule.setId(id);
             rule.setCreatedAt(oldRule.getCreatedAt());
+            // ✅ FIX: Use required tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             RefundRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("REFUND", savedRule.getId(), "UPDATE", oldRule, savedRule, admin.getId());
 
@@ -218,6 +221,8 @@ public class AdminRefundRuleController {
             oldRule.setActive(rule.isActive());
 
             rule.setActive(!rule.isActive());
+            // ✅ FIX: Use required tenant ID – fail closed (preserve tenant)
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             RefundRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("REFUND", savedRule.getId(), "TOGGLE", oldRule, savedRule, admin.getId());
 

@@ -8,10 +8,12 @@ import com.enterprise.refund.RefundRule;
 import com.enterprise.refund.RefundRuleRepository;
 import com.enterprise.refund.RefundService;
 import com.enterprise.tenant.Tenant;
+import com.enterprise.tenant.TenantContext;
 import com.enterprise.transaction.PaymentRequest;
 import com.enterprise.transaction.Transaction;
 import com.enterprise.transaction.TransactionRepository;
 import com.enterprise.transaction.TransactionService;
+import com.enterprise.transaction.TransactionStatus;
 import com.enterprise.util.TestDataBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,10 +62,12 @@ public class RefundIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        tenant = testDataBuilder.createTenant("RefundTest");
+        String uniqueId = UUID.randomUUID().toString();
+        tenant = testDataBuilder.createTenant("RefundTest_" + uniqueId);
         customer = testDataBuilder.createUser("customer@refund.com", "CUSTOMER", tenant);
         merchant = testDataBuilder.createUser("merchant@refund.com", "MERCHANT", tenant);
         admin = testDataBuilder.createUser("admin@refund.com", "ADMIN", tenant);
+        TenantContext.setTenantId(tenant.getId());
 
         refundRuleRepository.deleteAll();
         RefundRule allowRule = new RefundRule();
@@ -100,6 +104,7 @@ public class RefundIntegrationTest extends BaseIntegrationTest {
         redisTemplate.keys("idem:*").forEach(key -> redisTemplate.delete(key));
         refundRuleRepository.deleteAll();
         testDataBuilder.cleanup();
+        TenantContext.clear();
     }
 
     @Test
@@ -121,27 +126,22 @@ public class RefundIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldNotRefundNonSettledTransaction() {
-        Invoice pendingInvoice = testDataBuilder.createInvoiceApproved(
-                merchant.getId(),
-                customer.getEmail(),
-                BigDecimal.valueOf(50.00),
-                "Pending refund test"
-        );
-        String idempotencyKey = UUID.randomUUID().toString();
-        PaymentRequest request = new PaymentRequest();
-        request.setInvoiceId(pendingInvoice.getId());
-        request.setCustomerId(customer.getId());
-        request.setMerchantId(merchant.getId());
-        request.setAmount(pendingInvoice.getAmount());
-        transactionService.processPayment(request, idempotencyKey);
+        // Create a pending transaction manually
+        Transaction pendingTx = new Transaction();
+        pendingTx.setInvoiceId(invoice.getId());
+        pendingTx.setCustomerId(customer.getId());
+        pendingTx.setMerchantId(merchant.getId());
+        pendingTx.setAmount(BigDecimal.valueOf(50.00));
+        pendingTx.setCurrency("GBP");
+        pendingTx.setStatus(TransactionStatus.PENDING);
+        pendingTx.setIdempotencyKey(UUID.randomUUID().toString());
+        pendingTx.setTenantId(tenant.getId());
 
-        Transaction pendingTx = transactionRepository.findAll().stream()
-                .filter(tx -> "PENDING".equals(tx.getStatus().name()))
-                .findFirst()
-                .orElseThrow();
+        Transaction savedPending = transactionRepository.save(pendingTx);
+        Long pendingTxId = savedPending.getId();
 
         assertThrows(IllegalStateException.class, () -> {
-            refundService.processRefund(pendingTx.getId(), admin.getId(), "Invalid refund");
+            refundService.processRefund(pendingTxId, admin.getId(), "Invalid refund");
         });
     }
 

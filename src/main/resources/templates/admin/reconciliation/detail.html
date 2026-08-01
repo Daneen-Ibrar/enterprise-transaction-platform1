@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Reconciliation Detail</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #333;
+            margin-top: 30px;
+        }
+        .summary-card {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .summary-label {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .summary-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .text-green {
+            color: #16a34a;
+        }
+        .text-red {
+            color: #dc2626;
+        }
+        .text-gray {
+            color: #6b7280;
+        }
+        .text-blue {
+            color: #2563eb;
+        }
+        .text-blue a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .text-blue a:hover {
+            text-decoration: underline;
+        }
+        .font-mono {
+            font-family: monospace;
+        }
+        .detail-row {
+            background: white;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .detail-row:hover {
+            background: #f9fafb;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .detail-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .detail-right {
+            font-size: 14px;
+        }
+        .badge {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-yellow {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .badge-red {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .badge-blue {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .empty-state {
+            text-align: center;
+            color: #6b7280;
+            padding: 24px;
+        }
+        .detail-list {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin/reconciliation" class="back-link">← Back to list</a>
+
+        <h1>Reconciliation Report #<span th:text="${record.id}">1</span></h1>
+
+        <!-- Summary card -->
+        <div class="summary-card">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="summary-label">Status</span>
+                    <span class="summary-value" th:class="${record.status == 'PASS'} ? 'text-green' : 'text-red'" th:text="${record.status}">PASS</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Tx</span>
+                    <span class="summary-value" th:text="${record.totalTransactions}">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Matched</span>
+                    <span class="summary-value text-green" th:text="${record.matchedTransactions}">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Mismatched</span>
+                    <span class="summary-value text-red" th:text="${record.mismatchedTransactions}">0</span>
+                </div>
+            </div>
+            <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px; font-size:14px;">
+                <div><span class="text-gray">Missing Ledger Entries:</span> <span class="font-mono" th:text="${record.missingLedgerCount}">0</span></div>
+                <div><span class="text-gray">Amount Mismatches:</span> <span class="font-mono" th:text="${record.amountMismatchCount}">0</span></div>
+                <div><span class="text-gray">Started:</span> <span th:text="${#dates.format(record.startedAt, 'dd/MM/yyyy HH:mm')}">--</span></div>
+                <div><span class="text-gray">Completed:</span> <span th:text="${#dates.format(record.completedAt, 'dd/MM/yyyy HH:mm')}">--</span></div>
+            </div>
+        </div>
+
+        <!-- Details list -->
+        <h2>Mismatched Transactions</h2>
+        <div class="detail-list">
+            <div th:each="detail : ${details}" class="detail-row">
+                <div class="detail-left">
+                    <span class="font-mono text-blue">
+                        <a th:href="'/transactions/' + ${detail.transactionId}" th:text="'#' + ${detail.transactionId}">#123</a>
+                    </span>
+                    <span class="badge"
+                          th:class="${detail.discrepancyType == 'MISSING_LEDGER'} ? 'badge-yellow' :
+                                    ${detail.discrepancyType == 'AMOUNT_MISMATCH'} ? 'badge-red' : 'badge-blue'"
+                          th:text="${detail.discrepancyType}">MISSING_LEDGER</span>
+                </div>
+                <div class="detail-right">
+                    <span class="text-gray">Expected:</span>
+                    <span class="font-mono" th:text="${detail.expectedAmount}">0.00</span>
+                    <span class="text-gray" style="margin-left:12px;">Actual:</span>
+                    <span class="font-mono" th:text="${detail.actualAmount}">0.00</span>
+                </div>
+                <div style="width:100%; font-size:13px; color:#6b7280; margin-top:4px;" th:text="${detail.description}">Description</div>
+            </div>
+            <div th:if="${details.empty}" class="empty-state">No mismatches found for this reconciliation.</div>
+        </div>
+    </div>
+</body>
+</html>

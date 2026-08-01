@@ -18,20 +18,78 @@
         .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; background: #3498db; color: white; }
         .btn:hover { opacity: 0.8; }
         h3 { margin-top: 0; }
+        .saved-reports { background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #cce5ff; margin: 15px 0; }
+        .saved-reports select, .saved-reports input { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
+        .saved-reports button { padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; }
+        .saved-reports .btn-save { background: #2d7a3a; color: white; }
+        .saved-reports .btn-load { background: #3498db; color: white; }
+        .saved-reports .btn-delete { background: #c0392b; color: white; }
+        #saveMessage { margin-left: 10px; font-size: 0.9em; }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal h3 { margin-top: 0; }
+        .modal .field-group { margin: 15px 0; }
+        .modal .field-group label { display: inline-block; margin-right: 15px; }
+        .modal .btn { margin-right: 10px; }
+        .btn-success { background: #2d7a3a; }
+        .btn-success:hover { background: #1e5c2a; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-purple { background: #8e44ad; }
+        .btn-purple:hover { background: #7d3c98; }
     </style>
 </head>
 <body>
     <h1>📊 Reports Dashboard</h1>
     <a href="/dashboard">← Back to Dashboard</a>
 
+    <!-- ===== SAVED REPORTS UI ===== -->
+    <div class="saved-reports">
+        <h3>📌 Saved Reports</h3>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="savedReportSelect" style="min-width: 200px;">
+                <option value="">-- Load saved report --</option>
+            </select>
+            <button id="loadReportBtn" class="btn-load">Load</button>
+            <button id="deleteReportBtn" class="btn-delete">Delete</button>
+            <span style="margin: 0 10px;">|</span>
+            <input type="text" id="reportName" placeholder="Enter report name" />
+            <button id="saveReportBtn" class="btn-save">Save Current Filters</button>
+            <span id="saveMessage"></span>
+        </div>
+    </div>
+
     <!-- Date Filter -->
     <div class="filter-bar">
-        <form method="get" th:action="@{/admin/reports}">
+        <form method="get" th:action="@{/admin/reports}" id="reportForm">
             <label>From:
-                <input type="date" name="startDate" th:value="${startDate}" />
+                <input type="date" name="startDate" th:value="${startDate}" id="startDate" />
             </label>
             <label>To:
-                <input type="date" name="endDate" th:value="${endDate}" />
+                <input type="date" name="endDate" th:value="${endDate}" id="endDate" />
             </label>
             <button type="submit">Apply</button>
             <a th:href="@{/admin/reports}" style="margin-left:10px;">Reset</a>
@@ -124,13 +182,48 @@
         </div>
     </div>
 
-    <!-- Export Buttons -->
-    <div style="margin-top: 30px;">
+    <!-- ===== EXPORT BUTTONS (with Advanced Export) ===== -->
+    <div style="margin-top: 30px; display: flex; flex-wrap: wrap; gap: 10px;">
         <a th:href="@{/admin/reports/data/transactions/csv(startDate=${startDate}, endDate=${endDate})}" class="btn">Download CSV</a>
         <a th:href="@{/admin/reports/export/pdf(startDate=${startDate}, endDate=${endDate})}" class="btn" style="background: #c0392b;">Download PDF</a>
         <a th:href="@{/admin/reports/export/excel(startDate=${startDate}, endDate=${endDate})}" class="btn" style="background: #2980b9;">Download Excel</a>
+        <button id="openExportModal" class="btn btn-purple">📤 Export Advanced</button>
     </div>
 
+    <!-- ===== ADVANCED EXPORT MODAL ===== -->
+    <div id="exportModal" class="modal-overlay">
+        <div class="modal">
+            <h3>📤 Export Transactions</h3>
+            <div class="field-group">
+                <label>Format:</label>
+                <select id="exportFormat">
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                    <option value="xml">XML</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label>Select fields to include:</label>
+                <div id="fieldCheckboxes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
+                    <label><input type="checkbox" class="field-option" value="id" checked> ID</label>
+                    <label><input type="checkbox" class="field-option" value="invoiceId" checked> Invoice</label>
+                    <label><input type="checkbox" class="field-option" value="customerId" checked> Customer</label>
+                    <label><input type="checkbox" class="field-option" value="merchantId" checked> Merchant</label>
+                    <label><input type="checkbox" class="field-option" value="amount" checked> Amount</label>
+                    <label><input type="checkbox" class="field-option" value="currency" checked> Currency</label>
+                    <label><input type="checkbox" class="field-option" value="status" checked> Status</label>
+                    <label><input type="checkbox" class="field-option" value="createdAt" checked> Created</label>
+                    <label><input type="checkbox" class="field-option" value="updatedAt"> Updated</label>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <button id="exportBtn" class="btn btn-success">Export</button>
+                <button id="closeExportModal" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js Scripts -->
     <script th:inline="javascript">
         /*<![CDATA[*/
         document.addEventListener('DOMContentLoaded', function() {
@@ -262,6 +355,159 @@
             });
         });
         /*]]>*/
+    </script>
+
+    <!-- ===== SAVED REPORTS & EXPORT JAVASCRIPT ===== -->
+    <script>
+        (function() {
+            // ----- Saved Reports -----
+            const select = document.getElementById('savedReportSelect');
+            const loadBtn = document.getElementById('loadReportBtn');
+            const deleteBtn = document.getElementById('deleteReportBtn');
+            const saveBtn = document.getElementById('saveReportBtn');
+            const reportNameInput = document.getElementById('reportName');
+            const messageSpan = document.getElementById('saveMessage');
+            const reportForm = document.getElementById('reportForm');
+
+            function loadReportList() {
+                fetch('/admin/api/reports/type/transaction')
+                    .then(response => response.json())
+                    .then(data => {
+                        select.innerHTML = '<option value="">-- Load saved report --</option>';
+                        data.forEach(report => {
+                            const option = document.createElement('option');
+                            option.value = report.id;
+                            option.textContent = report.name;
+                            select.appendChild(option);
+                        });
+                    })
+                    .catch(err => console.error('Failed to load reports', err));
+            }
+
+            function getCurrentFilters() {
+                const formData = new FormData(reportForm);
+                const filters = {};
+                for (let [key, value] of formData.entries()) {
+                    if (value && value.trim() !== '') {
+                        filters[key] = value;
+                    }
+                }
+                return filters;
+            }
+
+            function applyFilters(filters) {
+                Object.keys(filters).forEach(key => {
+                    const input = document.querySelector(`[name="${key}"]`);
+                    if (input) input.value = filters[key];
+                });
+                reportForm.submit();
+            }
+
+            loadReportList();
+
+            loadBtn.addEventListener('click', function() {
+                const id = select.value;
+                if (!id) return;
+                fetch(`/admin/api/reports/${id}`)
+                    .then(response => response.json())
+                    .then(filters => applyFilters(filters))
+                    .catch(err => alert('Failed to load report: ' + err.message));
+            });
+
+            deleteBtn.addEventListener('click', function() {
+                const id = select.value;
+                if (!id) return;
+                if (!confirm('Delete this saved report?')) return;
+                fetch(`/admin/api/reports/${id}`, { method: 'DELETE' })
+                    .then(() => {
+                        loadReportList();
+                        alert('Report deleted.');
+                    })
+                    .catch(err => alert('Failed to delete: ' + err.message));
+            });
+
+            saveBtn.addEventListener('click', function() {
+                const name = reportNameInput.value.trim();
+                if (!name) {
+                    messageSpan.textContent = 'Please enter a name.';
+                    return;
+                }
+                const filters = getCurrentFilters();
+                fetch('/admin/api/reports/save?name=' + encodeURIComponent(name) + '&reportType=transaction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(filters)
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Save failed');
+                    return response.json();
+                })
+                .then(() => {
+                    messageSpan.textContent = '✅ Report saved successfully!';
+                    messageSpan.style.color = 'green';
+                    reportNameInput.value = '';
+                    loadReportList();
+                })
+                .catch(err => {
+                    messageSpan.textContent = '❌ Error: ' + err.message;
+                    messageSpan.style.color = 'red';
+                });
+            });
+
+            // ----- Advanced Export Modal -----
+            const modal = document.getElementById('exportModal');
+            const openBtn = document.getElementById('openExportModal');
+            const closeBtn = document.getElementById('closeExportModal');
+            const exportBtn = document.getElementById('exportBtn');
+
+            openBtn.addEventListener('click', function() {
+                modal.classList.add('show');
+            });
+
+            closeBtn.addEventListener('click', function() {
+                modal.classList.remove('show');
+            });
+
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
+
+            exportBtn.addEventListener('click', function() {
+                const format = document.getElementById('exportFormat').value;
+                const fields = Array.from(document.querySelectorAll('.field-option:checked')).map(cb => cb.value);
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                if (!startDate || !endDate) {
+                    alert('Please select a date range first.');
+                    return;
+                }
+
+                fetch('/admin/reports/export/advanced', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ format, fields, startDate, endDate })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Export failed');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `transactions.${format}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                    modal.classList.remove('show');
+                })
+                .catch(err => alert('Export failed: ' + err.message));
+            });
+        })();
     </script>
 </body>
 </html>

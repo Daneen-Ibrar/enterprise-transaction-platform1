@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Exchange Rates</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1f2937; margin-top: 0; }
+        .header-actions { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { background: #f9fafb; text-align: left; padding: 12px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; }
+        td { padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        tr:hover { background: #f9fafb; }
+        .actions form { display: inline; margin: 0 2px; }
+        .empty { text-align: center; color: #6b7280; padding: 20px; }
+        .success-msg { background: #d1fae5; color: #065f46; padding: 12px; border-radius: 4px; margin-bottom: 16px; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Exchange Rates</h1>
+        <div th:if="${success}" class="success-msg" th:text="${success}"></div>
+        <div class="header-actions">
+            <a href="/admin/exchange-rates/create" class="btn btn-primary">➕ Create New</a>
+            <a href="/dashboard" class="btn btn-secondary">← Dashboard</a>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Rate</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="rate : ${rates}">
+                    <td th:text="${rate.fromCurrency}">GBP</td>
+                    <td th:text="${rate.toCurrency}">USD</td>
+                    <td th:text="${rate.rate}">1.27</td>
+                    <td th:text="${#temporals.format(rate.updatedAt, 'dd/MM/yyyy HH:mm')}">--</td>
+                    <td class="actions">
+                        <a th:href="'/admin/exchange-rates/' + ${rate.id} + '/edit'" class="btn btn-primary btn-sm">Edit</a>
+                        <form th:action="'/admin/exchange-rates/' + ${rate.id} + '/delete'" method="post" onsubmit="return confirm('Delete this rate?');">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:if="${rates.empty}">
+                    <td colspan="5" class="empty">No exchange rates found.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

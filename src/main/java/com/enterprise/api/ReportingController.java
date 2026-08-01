@@ -1,5 +1,7 @@
 package com.enterprise.api;
 
+import com.enterprise.reporting.ExportRequest;
+import com.enterprise.reporting.ExportService;
 import com.enterprise.reporting.ReportingService;
 import com.enterprise.reporting.PdfExportService;
 import com.enterprise.reporting.ExcelExportService;
@@ -11,10 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -31,13 +30,16 @@ public class ReportingController {
     private final ReportingService reportingService;
     private final PdfExportService pdfExportService;
     private final ExcelExportService excelExportService;
+    private final ExportService exportService; // NEW
 
     public ReportingController(ReportingService reportingService,
                                PdfExportService pdfExportService,
-                               ExcelExportService excelExportService) {
+                               ExcelExportService excelExportService,
+                               ExportService exportService) {
         this.reportingService = reportingService;
         this.pdfExportService = pdfExportService;
         this.excelExportService = excelExportService;
+        this.exportService = exportService;
     }
 
     @GetMapping
@@ -71,7 +73,6 @@ public class ReportingController {
         List<String> statusLabels = new ArrayList<>(statusDist.keySet());
         List<Long> statusValues = statusLabels.stream().map(statusDist::get).collect(Collectors.toList());
 
-        // Top merchants for bar chart
         List<String> merchantLabels = topMerchants.stream()
                 .map(m -> "Merchant " + m.get("merchantId"))
                 .collect(Collectors.toList());
@@ -79,7 +80,6 @@ public class ReportingController {
                 .map(m -> ((BigDecimal) m.get("totalAmount")).doubleValue())
                 .collect(Collectors.toList());
 
-        // Daily success rate values
         List<Double> successRateValues = labels.stream()
                 .map(label -> successRate.getOrDefault(LocalDate.parse(label, formatter), 0.0))
                 .collect(Collectors.toList());
@@ -175,5 +175,31 @@ public class ReportingController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report_" + startDate + "_to_" + endDate + ".xlsx")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(excelStream.toByteArray());
+    }
+
+    // ===== ADVANCED EXPORT (NEW) =====
+    @PostMapping("/export/advanced")
+    public ResponseEntity<byte[]> exportAdvanced(@RequestBody ExportRequest request) {
+        LocalDate startDate = LocalDate.parse(request.getStartDate());
+        LocalDate endDate = LocalDate.parse(request.getEndDate());
+
+        List<Transaction> transactions = reportingService.getTransactionsBetween(startDate, endDate);
+
+        try {
+            byte[] data = exportService.export(transactions, request.getFormat(), request.getFields());
+            String contentType = switch (request.getFormat().toLowerCase()) {
+                case "json" -> "application/json";
+                case "xml" -> "application/xml";
+                case "csv" -> "text/csv";
+                default -> "application/octet-stream";
+            };
+            String filename = "transactions." + request.getFormat().toLowerCase();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .body(data);
+        } catch (Exception e) {
+            throw new RuntimeException("Export failed", e);
+        }
     }
 }

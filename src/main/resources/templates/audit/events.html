@@ -2,16 +2,36 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Audit Events</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .btn { padding: 6px 15px; background: #2d7a3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #1e5c2a; }
+        .pagination { margin-top: 15px; }
+        .pagination a, .pagination span { padding: 6px 12px; border: 1px solid #ddd; text-decoration: none; }
+        .pagination .active { background: #2d7a3a; color: white; border-color: #2d7a3a; }
+    </style>
 </head>
 <body>
     <h1>Audit Events</h1>
     <a href="/dashboard">← Back to Dashboard</a>
-    <button id="verifyBtn">Verify Chain Integrity</button>
+    <button id="verifyBtn" class="btn">Verify Chain Integrity</button>
     <div id="verifyResult"></div>
 
-    <table border="1" cellpadding="8">
+    <table>
         <thead>
-            <tr><th>ID</th><th>Type</th><th>User</th><th>Details</th><th>Previous Hash</th><th>Current Hash</th><th>Created</th></tr>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>User</th>
+                <th>Details</th>
+                <th>Previous Hash</th>
+                <th>Current Hash</th>
+                <th>Created</th>
+                <th>Diff</th>
+            </tr>
         </thead>
         <tbody>
             <tr th:each="event : ${events.content}">
@@ -22,19 +42,39 @@
                 <td th:text="${event.previousHash}">abc</td>
                 <td th:text="${event.currentHash}">def</td>
                 <td th:text="${event.createdAt}">2026-01-01</td>
+                <td>
+                    <!-- ✅ Use /audit/diff instead of /admin/audit/diff -->
+                    <a th:if="${event.previousState != null && event.currentState != null}"
+                       th:href="@{/audit/diff/{id}(id=${event.id})}" class="btn">Diff</a>
+                    <span th:unless="${event.previousState != null && event.currentState != null}">—</span>
+                </td>
             </tr>
         </tbody>
     </table>
-    <div>Page <span th:text="${currentPage + 1}">1</span> of <span th:text="${totalPages}">1</span></div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+        <span th:if="${currentPage > 0}">
+            <a th:href="@{/audit/events(page=${currentPage - 1})}">← Previous</a>
+        </span>
+        <span class="active" th:text="${currentPage + 1}">1</span>
+        <span th:if="${currentPage + 1 < totalPages}">
+            <a th:href="@{/audit/events(page=${currentPage + 1})}">Next →</a>
+        </span>
+    </div>
 
     <script>
         document.getElementById('verifyBtn').addEventListener('click', function() {
-            fetch('/api/audit/verify')   // <-- changed from /audit/verify
+            fetch('/audit/verify')
                 .then(response => response.json())
                 .then(data => {
                     const result = document.getElementById('verifyResult');
                     result.innerHTML = `<p><strong>Status:</strong> ${data.status}</p>`;
                     result.style.color = data.valid ? 'green' : 'red';
+                })
+                .catch(err => {
+                    document.getElementById('verifyResult').innerHTML =
+                        `<p style="color:red;">Error verifying chain: ${err.message}</p>`;
                 });
         });
     </script>

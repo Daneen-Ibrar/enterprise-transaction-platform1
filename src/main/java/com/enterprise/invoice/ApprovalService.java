@@ -1,14 +1,19 @@
 package com.enterprise.invoice;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class ApprovalService {
+
+    private static final Logger log = LoggerFactory.getLogger(ApprovalService.class);
 
     private final ApprovalRuleRepository ruleRepository;
     private final ExpressionParser parser = new SpelExpressionParser();
@@ -19,12 +24,13 @@ public class ApprovalService {
 
     public boolean evaluate(Invoice invoice) {
         List<ApprovalRule> rules = ruleRepository.findByActiveTrueOrderByPriorityAsc();
-        StandardEvaluationContext context = new StandardEvaluationContext();
+
+        // ✅ Use SimpleEvaluationContext – safe, read-only, no method calls
+        EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
         context.setVariable("amount", invoice.getAmount());
         context.setVariable("description", invoice.getDescription());
         context.setVariable("customerEmail", invoice.getCustomerEmail());
         context.setVariable("merchantId", invoice.getMerchantId());
-        // Add more variables as needed (e.g., merchant risk level)
 
         for (ApprovalRule rule : rules) {
             try {
@@ -33,8 +39,11 @@ public class ApprovalService {
                 if (Boolean.TRUE.equals(matches)) {
                     return rule.isRequiresApproval();
                 }
-            } catch (Exception ignored) {
-                // Log if needed – fail safe: default to requiring approval
+            } catch (Exception e) {
+                log.warn("Failed to evaluate approval rule {} (expr: {}): {}",
+                        rule.getId(), rule.getConditionExpression(), e.getMessage());
+                // Fail secure: if rule evaluation fails, treat as requiring approval
+                return true;
             }
         }
         // Default: require approval if no rule matches (fail secure)

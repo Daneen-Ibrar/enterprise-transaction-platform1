@@ -46,9 +46,7 @@
             justify-content: center;
             align-items: center;
         }
-        .modal-overlay.show {
-            display: flex;
-        }
+        .modal-overlay.show { display: flex; }
         .modal {
             background: white;
             border-radius: 12px;
@@ -68,21 +66,10 @@
             align-items: center;
             margin-bottom: 20px;
         }
-        .modal-header h2 {
-            margin: 0;
-            color: #2d7a3a;
-        }
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 28px;
-            cursor: pointer;
-            color: #999;
-        }
+        .modal-header h2 { margin: 0; color: #2d7a3a; }
+        .modal-close { background: none; border: none; font-size: 28px; cursor: pointer; color: #999; }
         .modal-close:hover { color: #333; }
-        .modal-body {
-            margin-bottom: 20px;
-        }
+        .modal-body { margin-bottom: 20px; }
         .modal-body .warning {
             background: #fff3cd;
             padding: 15px;
@@ -162,13 +149,14 @@
                 <th>Name</th>
                 <th>User</th>
                 <th>Status</th>
+                <th>Expires At</th>        <!-- NEW -->
                 <th>Last Used</th>
                 <th>Created</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="keyTableBody">
-            <tr><td colspan="8" class="empty-message">Loading...</td></tr>
+            <tr><td colspan="9" class="empty-message">Loading...</td></tr>
         </tbody>
     </table>
     <div id="emptyMessage" class="empty-message" style="display:none;">No keys found matching your criteria.</div>
@@ -228,7 +216,7 @@
                 .then(data => renderTable(data))
                 .catch(err => {
                     console.error('Error fetching keys:', err);
-                    tbody.innerHTML = '<tr><td colspan="8">Error loading keys.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9">Error loading keys.</td></tr>';
                     emptyMsg.style.display = 'none';
                 });
         }
@@ -244,12 +232,14 @@
                 const row = document.createElement('tr');
                 const statusClass = key.active ? 'badge-active' : 'badge-revoked';
                 const statusText = key.active ? '✅ Active' : '❌ Revoked';
+                const expires = key.expiresAt ? new Date(key.expiresAt).toLocaleString() : 'Never';
                 row.innerHTML = `
                     <td>${key.id}</td>
-                    <td><code>${key.keyValue}</code></td>
+                    <td><code>${key.maskedKey}</code></td>
                     <td>${key.name}</td>
                     <td>${key.userEmail}</td>
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
+                    <td>${expires}</td>
                     <td>${key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : '-'}</td>
                     <td>${new Date(key.createdAt).toLocaleString()}</td>
                     <td>
@@ -358,9 +348,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                // Show modal with the full key
-                // The full key is returned in the response (keyValue is the full key, not truncated)
-                // But the API returns ApiKeyResponse with keyValue as the full key
                 showModal(data.keyValue, data.name);
                 document.getElementById('keyName').value = '';
                 fetchKeys();

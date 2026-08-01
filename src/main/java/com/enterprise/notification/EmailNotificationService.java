@@ -26,27 +26,27 @@ public class EmailNotificationService {
     @Async
     @Transactional
     public void sendEmailAsync(String to, String subject, String body) {
-        // Save log entry first
-        EmailLog logEntry = new EmailLog(to, subject, body);
+        // For plain text, we just pass the body as is
+        sendHtmlEmailAsync(to, subject, body);
+    }
 
-        // ----- FIX: Set tenant ID from context -----
-        Long tenantId = TenantContext.getTenantId();
-        if (tenantId == null) {
-            tenantId = 1L; // fallback to default tenant
-        }
-        logEntry.setTenantId(tenantId);
-
+    @Async
+    @Transactional
+    public void sendHtmlEmailAsync(String to, String subject, String htmlBody) {
+        EmailLog logEntry = new EmailLog(to, subject, htmlBody);
+        logEntry.setTenantId(TenantContext.getRequiredTenantId());
         emailLogRepository.save(logEntry);
-        log.info("📧 sendEmailAsync called for: {}", to);
+        log.info("📧 Sending email to: {}", to);
 
         try {
-            emailService.sendEmail(to, subject, body);
+            // Use the appropriate service (RealEmailService will send HTML)
+            emailService.sendEmail(to, subject, htmlBody);
             logEntry.setStatus("SENT");
             logEntry.setSentAt(LocalDateTime.now());
         } catch (Exception e) {
             logEntry.setStatus("FAILED");
             logEntry.setErrorMessage(e.getMessage());
-            log.error("Email failed for {}: {}", to, e.getMessage());
+            log.error("❌ Email failed for {}: {}", to, e.getMessage());
         }
         emailLogRepository.save(logEntry);
     }
@@ -55,10 +55,6 @@ public class EmailNotificationService {
     public void resendEmail(Long logId) {
         EmailLog logEntry = emailLogRepository.findById(logId)
                 .orElseThrow(() -> new RuntimeException("Email log not found"));
-
-        // Re-use the same tenant ID from the original log when resending
-        // SendEmailAsync will set the tenant ID from context, but if the context is lost,
-        // we should ideally preserve it. For now, we just pass through.
-        sendEmailAsync(logEntry.getRecipient(), logEntry.getSubject(), logEntry.getBody());
+        sendHtmlEmailAsync(logEntry.getRecipient(), logEntry.getSubject(), logEntry.getBody());
     }
 }

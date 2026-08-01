@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <title>Refund Transaction</title>
     <style>
@@ -18,7 +19,8 @@
     <div th:if="${error}" class="flash-error" th:text="${error}">Error</div>
 
     <form method="post" th:action="@{/admin/refunds/{id}(id=${transaction.id})}">
-        <p><strong>Amount:</strong> <span th:text="${transaction.amount}">100.00</span></p>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <p><strong>Amount:</strong> <span th:text="${currencyHelper.getFormattedAmount(transaction.amount, transaction.currency)}">£ 100.00</span></p>
         <p><strong>Customer ID:</strong> <span th:text="${transaction.customerId}">1</span></p>
         <p><strong>Merchant ID:</strong> <span th:text="${transaction.merchantId}">2</span></p>
 

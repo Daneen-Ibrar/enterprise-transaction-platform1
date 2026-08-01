@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Webhook Simulator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { margin-bottom: 10px; }
+        .form-group { margin: 15px 0; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .form-group textarea { height: 200px; }
+        .btn { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #2d7a3a; color: white; }
+        .btn-primary:hover { background: #1e5c2a; }
+        .response-box { margin-top: 20px; border: 1px solid #ccc; border-radius: 4px; padding: 15px; background: #f9f9f9; display: none; }
+        .response-box h3 { margin-top: 0; }
+        .response-box .status { font-weight: bold; }
+        .status-2xx { color: #2d7a3a; }
+        .status-4xx, .status-5xx { color: #c0392b; }
+        .response-box pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .error { color: #c0392b; }
+        .back-link { display: inline-block; margin-bottom: 20px; }
+        .row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .col { flex: 1; min-width: 250px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📤 Webhook Simulator</h1>
+    <a href="/admin/webhooks" class="back-link">← Back to Webhooks</a>
+
+    <p>Send a test webhook to any URL. Use this to verify your webhook receiver is working correctly.</p>
+
+    <form id="simulatorForm">
+        <div class="form-group">
+            <label for="url">URL (required)</label>
+            <input type="url" id="url" name="url" placeholder="https://your-webhook-receiver.com/endpoint" required />
+        </div>
+
+        <div class="row">
+            <div class="col">
+                <div class="form-group">
+                    <label for="eventType">Event Type</label>
+                    <select id="eventType" name="eventType">
+                        <option th:each="type : ${eventTypes}" th:value="${type}" th:text="${type}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="col">
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 30px;">
+                    <button type="button" id="loadSampleBtn" class="btn btn-primary" style="background: #3498db;">📋 Load Sample Payload</button>
+                    <button type="button" id="formatPayloadBtn" class="btn" style="background: #6c757d; color: white;">🔧 Format JSON</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="payload">Payload (JSON)</label>
+            <textarea id="payload" name="payload" th:text="${samplePayload}">{"eventType":"TRANSACTION_SETTLED","timestamp":"2026-01-01T00:00:00Z"}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">🚀 Send Test Webhook</button>
+        <span id="loading" style="display: none; margin-left: 15px;">Sending...</span>
+    </form>
+
+    <!-- Response display -->
+    <div id="responseBox" class="response-box">
+        <h3>📨 Response</h3>
+        <div id="responseStatus" class="status"></div>
+        <div id="responseDuration" style="color: #888; font-size: 0.9em;"></div>
+        <div id="responseHeaders"></div>
+        <div id="responseBody"></div>
+    </div>
+
+    <div id="errorBox" class="error" style="display: none;"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('simulatorForm');
+            const urlInput = document.getElementById('url');
+            const eventTypeSelect = document.getElementById('eventType');
+            const payloadTextarea = document.getElementById('payload');
+            const responseBox = document.getElementById('responseBox');
+            const responseStatus = document.getElementById('responseStatus');
+            const responseDuration = document.getElementById('responseDuration');
+            const responseHeaders = document.getElementById('responseHeaders');
+            const responseBody = document.getElementById('responseBody');
+            const errorBox = document.getElementById('errorBox');
+            const loading = document.getElementById('loading');
+
+            // Sample payloads for different event types
+            const samplePayloads = {
+                'TRANSACTION_SETTLED': {
+                    "eventType": "TRANSACTION_SETTLED",
+                    "timestamp": new Date().toISOString(),
+                    "transactionId": 12345,
+                    "amount": "100.00",
+                    "currency": "GBP",
+                    "invoiceId": 6789,
+                    "merchantId": 1,
+                    "customerId": 2,
+                    "status": "SETTLED"
+                },
+                'REFUND_PROCESSED': {
+                    "eventType": "REFUND_PROCESSED",
+                    "timestamp": new Date().toISOString(),
+                    "refundTransactionId": 54321,
+                    "originalTransactionId": 12345,
+                    "amount": "100.00",
+                    "currency": "GBP",
+                    "reason": "Customer request"
+                }
+            };
+
+            // Load sample payload based on selected event type
+            function loadSamplePayload() {
+                const type = eventTypeSelect.value;
+                const sample = samplePayloads[type] || samplePayloads['TRANSACTION_SETTLED'];
+                payloadTextarea.value = JSON.stringify(sample, null, 2);
+            }
+
+            // Format JSON
+            function formatJson() {
+                try {
+                    const parsed = JSON.parse(payloadTextarea.value);
+                    payloadTextarea.value = JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                    alert('Invalid JSON: ' + e.message);
+                }
+            }
+
+            // Load sample on event type change
+            eventTypeSelect.addEventListener('change', loadSamplePayload);
+            document.getElementById('loadSampleBtn').addEventListener('click', loadSamplePayload);
+            document.getElementById('formatPayloadBtn').addEventListener('click', formatJson);
+
+            // Initial load
+            loadSamplePayload();
+
+            // Form submit
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert('Please enter a URL.');
+                    return;
+                }
+
+                // Validate JSON
+                let payload = payloadTextarea.value.trim();
+                if (payload) {
+                    try {
+                        JSON.parse(payload);
+                    } catch (err) {
+                        alert('Invalid JSON in payload: ' + err.message);
+                        return;
+                    }
+                } else {
+                    // Use sample
+                    payload = null;
+                }
+
+                const eventType = eventTypeSelect.value;
+                const formData = new FormData();
+                formData.append('url', url);
+                formData.append('eventType', eventType);
+                if (payload) {
+                    formData.append('payload', payload);
+                }
+
+                loading.style.display = 'inline';
+                responseBox.style.display = 'none';
+                errorBox.style.display = 'none';
+
+                fetch('/admin/webhooks/simulator/send', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loading.style.display = 'none';
+                    if (data.success) {
+                        responseBox.style.display = 'block';
+                        const statusClass = data.statusCode >= 200 && data.statusCode < 300 ? 'status-2xx' : 'status-4xx';
+                        responseStatus.className = 'status ' + statusClass;
+                        responseStatus.textContent = 'Status: ' + data.statusCode + ' ' + data.statusText;
+                        responseDuration.textContent = 'Duration: ' + data.durationMs + ' ms';
+                        responseHeaders.textContent = 'Headers: ' + JSON.stringify(data.headers, null, 2);
+                        responseBody.textContent = 'Body: ' + (data.body || '(empty)');
+                    } else {
+                        errorBox.style.display = 'block';
+                        errorBox.textContent = 'Error: ' + data.error;
+                    }
+                })
+                .catch(err => {
+                    loading.style.display = 'none';
+                    errorBox.style.display = 'block';
+                    errorBox.textContent = 'Request failed: ' + err.message;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

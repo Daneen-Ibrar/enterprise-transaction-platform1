@@ -1,0 +1,1 @@
+ALTER TABLE idempotency_key ALTER COLUMN response TYPE TEXT;

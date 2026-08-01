@@ -11,9 +11,10 @@ import com.enterprise.transaction.TransactionStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,7 +55,9 @@ public class RefundService {
     public RefundEligibility evaluate(Transaction transaction) {
         log.info("Evaluating refund eligibility for transaction {}", transaction.getId());
         List<RefundRule> rules = ruleRepository.findByActiveTrueOrderByRulePriorityAsc();
-        StandardEvaluationContext context = new StandardEvaluationContext();
+
+        // ✅ Use SimpleEvaluationContext – safe, read-only, no method calls
+        EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
         context.setVariable("amount", transaction.getAmount());
         context.setVariable("customerId", transaction.getCustomerId());
         context.setVariable("merchantId", transaction.getMerchantId());
@@ -64,18 +67,19 @@ public class RefundService {
                 Boolean matches = parser.parseExpression(rule.getConditionExpression())
                         .getValue(context, Boolean.class);
                 if (Boolean.TRUE.equals(matches)) {
-                    log.info("Rule matched: action={}", rule.getAction());
+                    log.info("Refund rule matched: action={}", rule.getAction());
                     return new RefundEligibility(rule.getAction(), rule.getRequiredPermission());
                 }
             } catch (Exception e) {
-                log.warn("Rule evaluation failed for expression: {}", rule.getConditionExpression(), e);
+                log.warn("Rule evaluation failed for expression {}: {}", rule.getConditionExpression(), e.getMessage());
+                // Fail secure: if rule evaluation fails, deny refund
+                return new RefundEligibility("DENY", null);
             }
         }
-        log.warn("No matching rule, defaulting to DENY");
+        log.warn("No matching refund rule, defaulting to DENY");
         return new RefundEligibility("DENY", null);
     }
 
-    // ===== SINGLE REFUND =====
     @Transactional
     public Transaction processRefund(Long originalTransactionId, Long adminId, String reason) {
         if (!featureFlagService.isEnabled("REFUNDS")) {
@@ -101,9 +105,7 @@ public class RefundService {
                 original.getAmount().negate(),
                 "refund-" + System.currentTimeMillis()
         );
-        // ===== FIX: Set tenant ID from original transaction =====
         refund.setTenantId(original.getTenantId());
-
         refund.setStatus(TransactionStatus.REFUNDED);
         refund = transactionRepository.save(refund);
 
@@ -113,7 +115,6 @@ public class RefundService {
         original.setStatus(TransactionStatus.REFUNDED);
         transactionRepository.save(original);
 
-        // Audit
         Map<String, Object> beforeMap = new HashMap<>();
         beforeMap.put("id", original.getId());
         beforeMap.put("invoiceId", original.getInvoiceId());
@@ -168,7 +169,6 @@ public class RefundService {
         return refund;
     }
 
-    // ===== BULK REFUND (NO @Transactional) =====
     public int bulkRefundTransactions(List<Long> transactionIds, Long adminId, String reason) {
         log.info("Bulk refunding {} transactions by admin {}", transactionIds.size(), adminId);
         if (!featureFlagService.isEnabled("REFUNDS")) {

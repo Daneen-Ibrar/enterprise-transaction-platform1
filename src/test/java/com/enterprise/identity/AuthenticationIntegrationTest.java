@@ -50,7 +50,8 @@ public class AuthenticationIntegrationTest {
 
     @Test
     void testAdminEndpointRequiresAuth() throws Exception {
+        // UI endpoints redirect to login page (302 Found)
         mockMvc.perform(get("/admin/reconciliation"))
-                .andExpect(status().isUnauthorized()); // or 302 redirect to login
+                .andExpect(status().isFound());
     }
 }

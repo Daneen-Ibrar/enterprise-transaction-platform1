@@ -119,9 +119,8 @@ public class ReconciliationService {
         record.setAmountMismatchCount(amountMismatchCount);
         record.setDetails(String.format("Total: %d, Matched: %d, Mismatched: %d", total, matched, mismatched));
 
-        // ----- FIX: Set tenant ID -----
-        Long tenantId = TenantContext.getTenantId();
-        record.setTenantId(tenantId != null ? tenantId : 1L);
+        // ✅ FIX: Use required tenant ID – fail closed
+        record.setTenantId(TenantContext.getRequiredTenantId());
 
         ReconciliationRecord savedRecord = recordRepository.save(record);
 

@@ -1,5 +1,6 @@
 package com.enterprise.reliability;
 
+import com.enterprise.tenant.TenantContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,16 +29,13 @@ public class ReliabilityPolicyService {
     }
 
     public FailureClassificationRule classifyFailure(String operationType, Exception ex) {
-        // Simple matching – in reality, you'd use a pattern or SpEL
         String message = ex.getMessage().toLowerCase();
         List<FailureClassificationRule> rules = ruleRepository.findByActiveTrueOrderByPriorityAsc();
         for (FailureClassificationRule rule : rules) {
-            // Very simple: check if message contains the condition string
             if (message.contains(rule.getConditionExpression().toLowerCase())) {
                 return rule;
             }
         }
-        // default: treat as transient
         FailureClassificationRule defaultRule = new FailureClassificationRule();
         defaultRule.setAction("RETRY");
         defaultRule.setCategory("TRANSIENT");
@@ -46,12 +44,35 @@ public class ReliabilityPolicyService {
     }
 
     public CircuitBreakerState getCircuitBreakerState(String operationType) {
-        return cbStateRepository.findByOperationType(operationType)
-                .orElseThrow(() -> new IllegalArgumentException("No circuit breaker state for " + operationType));
+        Long tenantId = TenantContext.getRequiredTenantId();
+        return cbStateRepository.findByOperationTypeAndTenantId(operationType, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("No circuit breaker state for " + operationType + " in tenant " + tenantId));
     }
 
     public CircuitBreakerPolicy getCircuitBreakerPolicy(String operationType) {
-        return cbPolicyRepository.findByOperationTypeAndActiveTrue(operationType)
-                .orElseThrow(() -> new IllegalArgumentException("No circuit breaker policy for " + operationType));
+        Long tenantId = TenantContext.getRequiredTenantId();
+        return cbPolicyRepository.findByOperationTypeAndTenantIdAndActiveTrue(operationType, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("No circuit breaker policy for " + operationType + " in tenant " + tenantId));
+    }
+
+    // Update methods (tenant-aware)
+    public void updateCircuitBreakerState(String operationType, String state) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+        cbStateRepository.updateState(operationType, tenantId, state);
+    }
+
+    public void incrementFailureCount(String operationType) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+        cbStateRepository.incrementFailureCount(operationType, tenantId);
+    }
+
+    public void incrementSuccessCount(String operationType) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+        cbStateRepository.incrementSuccessCount(operationType, tenantId);
+    }
+
+    public void resetCounts(String operationType) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+        cbStateRepository.resetCounts(operationType, tenantId);
     }
 }

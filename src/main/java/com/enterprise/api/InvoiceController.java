@@ -1,5 +1,6 @@
 package com.enterprise.api;
 
+import com.enterprise.currency.ExchangeRateService;
 import com.enterprise.invoice.Invoice;
 import com.enterprise.invoice.InvoiceMessage;
 import com.enterprise.invoice.InvoiceMessageService;
@@ -25,19 +26,22 @@ public class InvoiceController {
     private final InvoiceService invoiceService;
     private final UserRepository userRepository;
     private final InvoiceMessageService messageService;
+    private final ExchangeRateService exchangeRateService;
 
     public InvoiceController(InvoiceService invoiceService,
                              UserRepository userRepository,
-                             InvoiceMessageService messageService) {
+                             InvoiceMessageService messageService,
+                             ExchangeRateService exchangeRateService) {
         this.invoiceService = invoiceService;
         this.userRepository = userRepository;
         this.messageService = messageService;
+        this.exchangeRateService = exchangeRateService;
     }
 
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("invoice", new Invoice());
-        model.addAttribute("currencies", List.of("GBP", "USD", "EUR"));
+        model.addAttribute("currencies", com.enterprise.currency.CurrencyCodes.getAllCurrencies());
         return "invoice/create";
     }
 
@@ -51,7 +55,6 @@ public class InvoiceController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Long merchantId = merchant.getId();
 
-        // Determine if approval is needed (e.g., amount > 5000)
         boolean requiresApproval = amount.compareTo(BigDecimal.valueOf(5000)) > 0;
 
         invoiceService.createInvoice(amount, description, customerEmail, merchantId, requiresApproval, currency);
@@ -80,13 +83,46 @@ public class InvoiceController {
         try {
             Invoice invoice = invoiceService.findById(id)
                     .orElseThrow(() -> new RuntimeException("Invoice not found"));
+            // Add currency symbol
+            String symbol = exchangeRateService.getSymbol(invoice.getCurrency());
             model.addAttribute("invoice", invoice);
+            model.addAttribute("symbol", symbol);
             return "invoice/detail";
         } catch (Exception e) {
             log.error("Error loading invoice detail for id {}: {}", id, e.getMessage(), e);
             model.addAttribute("error", "Could not load invoice details.");
             return "error";
         }
+    }
+
+    @GetMapping("/{id}/edit")
+    public String showEditForm(@PathVariable Long id, Model model) {
+        Invoice invoice = invoiceService.findById(id)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        model.addAttribute("invoice", invoice);
+        model.addAttribute("currencies", com.enterprise.currency.CurrencyCodes.getAllCurrencies());
+        return "invoice/edit";
+    }
+
+    @PostMapping("/{id}")
+    public String updateInvoice(@PathVariable Long id,
+                                @RequestParam String description,
+                                @RequestParam(required = false) String currency,
+                                Authentication authentication) {
+        Invoice invoice = invoiceService.findById(id)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        AppUser user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!invoice.getMerchantId().equals(user.getId())) {
+            throw new RuntimeException("You do not own this invoice");
+        }
+        invoice.setDescription(description);
+        if (currency != null && !currency.isEmpty()) {
+            invoice.setCurrency(currency);
+        }
+        invoice.setUpdatedAt(java.time.LocalDateTime.now());
+        invoiceService.updateInvoice(invoice);
+        return "redirect:/invoices/" + id;
     }
 
     @GetMapping("/{id}/pay")

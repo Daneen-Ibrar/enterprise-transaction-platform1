@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +13,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -28,34 +30,31 @@ public class AuditService {
         this.objectMapper = objectMapper;
     }
 
-    // ----- Full recordEvent with snapshots -----
     @Transactional
     public AuditEvent recordEvent(String eventType, Long userId, Object details,
                                   String entityType, Long entityId,
                                   Object previousState, Object currentState) {
         try {
+            Long tenantId = TenantContext.getRequiredTenantId();
+            Long effectiveUserId = (userId != null) ? userId : 0L;
+
             String detailsJson = objectMapper.writeValueAsString(details);
             String previousJson = previousState != null ? objectMapper.writeValueAsString(previousState) : null;
             String currentJson = currentState != null ? objectMapper.writeValueAsString(currentState) : null;
 
-            String previousHash = auditRepository.findFirstByOrderByCreatedAtDesc()
+            String previousHash = auditRepository
+                    .findFirstByTenantIdOrderByCreatedAtDesc(tenantId)
                     .map(AuditEvent::getCurrentHash)
                     .orElse("");
 
-            String input = previousHash + detailsJson + eventType + userId;
+            String input = previousHash + detailsJson + eventType + effectiveUserId;
             String currentHash = hash(input);
 
-            AuditEvent event = new AuditEvent(eventType, userId, detailsJson, previousHash, currentHash);
+            AuditEvent event = new AuditEvent(eventType, effectiveUserId, detailsJson, previousHash, currentHash);
             event.setEntityType(entityType);
             event.setEntityId(entityId);
             event.setPreviousState(previousJson);
             event.setCurrentState(currentJson);
-
-            // ----- FIX: Set tenant ID from context -----
-            Long tenantId = TenantContext.getTenantId();
-            if (tenantId == null) {
-                tenantId = 1L; // fallback to default tenant
-            }
             event.setTenantId(tenantId);
 
             return auditRepository.save(event);
@@ -66,7 +65,6 @@ public class AuditService {
         }
     }
 
-    // ----- Legacy recordEvent (without snapshots) -----
     @Transactional
     public AuditEvent recordEvent(String eventType, Long userId, Object details) {
         return recordEvent(eventType, userId, details, null, null, null, null);
@@ -79,30 +77,60 @@ public class AuditService {
     }
 
     public boolean verifyChain() {
-        List<AuditEvent> events = auditRepository.findAll();
-        if (events.isEmpty()) return true;
+        Long tenantId = TenantContext.getRequiredTenantId();
+        return verifyChainForTenant(tenantId);
+    }
 
+    public boolean verifyChainForTenant(Long tenantId) {
+        int pageSize = 100; // configurable if needed
+        int page = 0;
         String expectedPreviousHash = "";
-        for (AuditEvent event : events) {
-            if (!event.getPreviousHash().equals(expectedPreviousHash)) {
-                log.warn("Chain broken at event {}: expected previous hash {}, got {}",
-                        event.getId(), expectedPreviousHash, event.getPreviousHash());
-                return false;
+        boolean first = true;
+
+        while (true) {
+            PageRequest pageRequest = PageRequest.of(page, pageSize);
+            var pageEvents = auditRepository.findByTenantIdOrderByCreatedAtAsc(tenantId, pageRequest);
+            if (pageEvents.isEmpty()) {
+                break;
             }
-            String input = event.getPreviousHash() + event.getDetails() + event.getEventType() + event.getUserId();
-            try {
-                String recomputed = hash(input);
-                if (!recomputed.equals(event.getCurrentHash())) {
-                    log.warn("Hash mismatch at event {}: stored {}, computed {}",
-                            event.getId(), event.getCurrentHash(), recomputed);
+
+            for (AuditEvent event : pageEvents.getContent()) {
+                if (first) {
+                    if (!event.getPreviousHash().isEmpty()) {
+                        log.warn("First event for tenant {} has non-empty previous hash: {}", tenantId, event.getPreviousHash());
+                        return false;
+                    }
+                    first = false;
+                } else {
+                    if (!event.getPreviousHash().equals(expectedPreviousHash)) {
+                        log.warn("Chain broken at event {} for tenant {}: expected {}, got {}",
+                                event.getId(), tenantId, expectedPreviousHash, event.getPreviousHash());
+                        return false;
+                    }
+                }
+
+                String input = event.getPreviousHash() + event.getDetails() + event.getEventType() + event.getUserId();
+                try {
+                    String recomputed = hash(input);
+                    if (!recomputed.equals(event.getCurrentHash())) {
+                        log.warn("Hash mismatch at event {} for tenant {}: stored {}, computed {}",
+                                event.getId(), tenantId, event.getCurrentHash(), recomputed);
+                        return false;
+                    }
+                } catch (NoSuchAlgorithmException e) {
+                    log.error("Hash algorithm not found", e);
                     return false;
                 }
+
                 expectedPreviousHash = event.getCurrentHash();
-            } catch (NoSuchAlgorithmException e) {
-                log.error("Hash algorithm not found", e);
-                return false;
             }
+
+            if (pageEvents.isLast()) {
+                break;
+            }
+            page++;
         }
+
         return true;
     }
 

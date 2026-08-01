@@ -50,12 +50,13 @@ public class InvoiceService {
         this.objectMapper = objectMapper;
     }
 
-    // ===== CREATE INVOICE =====
+    // ===== UPDATED CREATE INVOICE – with WooCommerce fields =====
     @Transactional
     public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
-                                 Long merchantId, boolean requiresApproval, String currency) {
-        log.info("📝 Creating invoice for merchant {}: amount {}, description '{}', customer {}",
-                merchantId, amount, description, customerEmail);
+                                 Long merchantId, boolean requiresApproval, String currency,
+                                 Long wooOrderId, String webhookUrl, String returnUrl) {
+        log.info("📝 Creating invoice for merchant {}: amount {}, description '{}', customer {}, currency {}",
+                merchantId, amount, description, customerEmail, currency);
 
         AppUser merchant = userRepository.findById(merchantId)
                 .orElseThrow(() -> {
@@ -66,15 +67,16 @@ public class InvoiceService {
             log.error("❌ Merchant account is disabled: {}", merchantId);
             throw new RuntimeException("Merchant account is disabled");
         }
-        Long tenantId = merchant.getTenantId();
-        if (tenantId == null) {
-            log.warn("⚠️ Merchant {} has null tenantId, falling back to default tenant 1", merchantId);
-            tenantId = 1L;
-        }
+        Long tenantId = TenantContext.getRequiredTenantId();
 
         Invoice invoice = new Invoice(amount, description, customerEmail, merchantId);
         invoice.setCurrency(currency != null && !currency.isEmpty() ? currency : "GBP");
         invoice.setTenantId(tenantId);
+
+        // Store WooCommerce fields (may be null)
+        invoice.setWooOrderId(wooOrderId);
+        invoice.setWebhookUrl(webhookUrl);
+        invoice.setReturnUrl(returnUrl);
 
         SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
         invoice.setRiskLevel(result.getRiskLevel());
@@ -99,14 +101,13 @@ public class InvoiceService {
         auditService.recordEvent(
                 "INVOICE_CREATED",
                 merchantId,
-                Map.of("invoiceId", invoice.getId(), "amount", amount, "customer", customerEmail),
+                Map.of("invoiceId", invoice.getId(), "amount", amount, "customer", customerEmail, "currency", currency),
                 "Invoice",
                 invoice.getId(),
                 beforeMap,
                 afterMap
         );
 
-        // Notify merchant
         notificationService.createNotification(
                 merchantId,
                 "INVOICE_CREATED",
@@ -150,7 +151,13 @@ public class InvoiceService {
         return invoice;
     }
 
-    // ===== SINGLE APPROVE =====
+    // ===== OVERLOADED VERSION – for backward compatibility (calls the new one with nulls) =====
+    @Transactional
+    public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
+                                 Long merchantId, boolean requiresApproval, String currency) {
+        return createInvoice(amount, description, customerEmail, merchantId,
+                requiresApproval, currency, null, null, null);
+    }
     @Transactional
     public Invoice approveInvoice(Long invoiceId, Long adminId) {
         log.info("🔵 InvoiceService.approveInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
@@ -208,7 +215,6 @@ public class InvoiceService {
         return afterEntity;
     }
 
-    // ===== SINGLE REJECT =====
     @Transactional
     public Invoice rejectInvoice(Long invoiceId, Long adminId) {
         log.info("🔴 InvoiceService.rejectInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
@@ -263,7 +269,6 @@ public class InvoiceService {
         return afterEntity;
     }
 
-    // ===== BULK APPROVE =====
     public int bulkApproveInvoices(List<Long> invoiceIds, Long adminId) {
         log.info("🟢 bulkApproveInvoices() called with {} invoices by admin {}", invoiceIds.size(), adminId);
         int approvedCount = 0;
@@ -280,7 +285,6 @@ public class InvoiceService {
         return approvedCount;
     }
 
-    // ===== BULK REJECT =====
     public int bulkRejectInvoices(List<Long> invoiceIds, Long adminId) {
         log.info("🔴 bulkRejectInvoices() called with {} invoices by admin {}", invoiceIds.size(), adminId);
         int rejectedCount = 0;
@@ -297,7 +301,6 @@ public class InvoiceService {
         return rejectedCount;
     }
 
-    // ===== MARK AS PAID =====
     @Transactional
     public void markAsPaid(Long invoiceId, Long transactionId) {
         log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
@@ -345,7 +348,12 @@ public class InvoiceService {
         }
     }
 
-    // ===== RE-EVALUATION METHODS =====
+    public boolean isInvoicePaid(Long invoiceId) {
+        return invoiceRepository.findById(invoiceId)
+                .map(inv -> "PAID".equals(inv.getStatus()))
+                .orElse(false);
+    }
+
     @Transactional
     public void reEvaluateAllInvoices() {
         log.info("🔄 Re-evaluating all non-paid invoices for approval rules");
@@ -429,23 +437,20 @@ public class InvoiceService {
         reEvaluateAllInvoicesForSuspicion();
     }
 
-    // ===== HELPERS =====
+    @Transactional
+    public void updateInvoice(Invoice invoice) {
+        Invoice existing = invoiceRepository.findById(invoice.getId())
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        existing.setDescription(invoice.getDescription());
+        existing.setCurrency(invoice.getCurrency());
+        existing.setUpdatedAt(LocalDateTime.now());
+        invoiceRepository.save(existing);
+    }
+
     private Long getUserIdByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(AppUser::getId)
                 .orElse(null);
-    }
-
-    public List<Invoice> getInvoicesForMerchant(Long merchantId) {
-        return invoiceRepository.findByMerchantId(merchantId);
-    }
-
-    public List<Invoice> getInvoicesForCustomer(String email) {
-        return invoiceRepository.findByCustomerEmail(email);
-    }
-
-    public List<Invoice> getPendingApprovalInvoices() {
-        return invoiceRepository.findByStatusAndRequiresApproval("PENDING_APPROVAL", true);
     }
 
     public Optional<Invoice> findById(Long id) {
@@ -454,5 +459,17 @@ public class InvoiceService {
 
     public List<Invoice> findAll() {
         return invoiceRepository.findAll();
+    }
+
+    public List<Invoice> getInvoicesForMerchant(Long merchantId) {
+        return invoiceRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId);
+    }
+
+    public List<Invoice> getInvoicesForCustomer(String email) {
+        return invoiceRepository.findByCustomerEmailOrderByCreatedAtDesc(email);
+    }
+
+    public List<Invoice> getPendingApprovalInvoices() {
+        return invoiceRepository.findByStatusAndRequiresApproval("PENDING_APPROVAL", true);
     }
 }

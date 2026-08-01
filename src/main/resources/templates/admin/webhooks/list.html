@@ -4,90 +4,85 @@
     <title>Webhooks</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 0.85em; }
+        .btn-create { background: #2d7a3a; color: white; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-delete { background: #c0392b; color: white; }
+        .btn-toggle { background: #f39c12; color: white; }
+        .btn-deliveries { background: #8e44ad; color: white; }
+        .btn-simulator { background: #1abc9c; color: white; }
         table { border-collapse: collapse; width: 100%; margin-top: 15px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #f2f2f2; }
-        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-create { background: #2d7a3a; color: white; padding: 8px 16px; }
-        .btn-edit { background: #3498db; color: white; }
-        .btn-delete { background: #c0392b; color: white; }
-        .btn-toggle { background: #e67e22; color: white; }
-        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
-        .badge-active { background: #d4edda; color: #155724; }
-        .badge-inactive { background: #f8d7da; color: #721c24; }
-        .actions { display: flex; gap: 4px; flex-wrap: wrap; }
-        .flash-success { background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; margin: 10px 0; }
-        .flash-error { background: #f8d7da; color: #721c24; padding: 10px; border: 1px solid #f5c6cb; margin: 10px 0; }
-        .banner-disabled {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .banner-disabled a {
-            color: #721c24;
-            font-weight: bold;
-        }
+        .badge { padding: 2px 8px; border-radius: 12px; color: white; }
+        .badge-active { background: #2d7a3a; }
+        .badge-inactive { background: #c0392b; }
+        .feature-toggle { margin: 10px 0; }
+        .feature-toggle label { margin-right: 20px; }
+        .actions-row { display: flex; gap: 5px; flex-wrap: wrap; }
     </style>
 </head>
 <body>
-    <h1>🌐 Webhooks</h1>
+<div class="container">
+    <h1>🌐 Webhook Configurations</h1>
     <a href="/dashboard">← Back to Dashboard</a>
-    <a href="/admin/webhooks/create" class="btn btn-create" style="margin-left: 20px;">+ Create Webhook</a>
 
-    <!-- ===== DISABLED BANNER ===== -->
-    <div th:if="${!webhooksEnabled}" class="banner-disabled">
-        ⚠️ Webhook delivery is currently <strong>disabled</strong>. Enable it from
-        <a href="/admin/features">Feature Toggles</a> to send webhook events.
+    <!-- Feature flag -->
+    <div class="feature-toggle">
+        <form method="post" th:action="@{/admin/features/toggle}">
+            <input type="hidden" name="id" value="1" />
+            <label>
+                <input type="checkbox" th:checked="${webhooksEnabled}" disabled />
+                Webhooks enabled (feature flag)
+            </label>
+        </form>
     </div>
 
-    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
-    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+    <div style="margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/admin/webhooks/create" class="btn btn-create">+ Create Webhook</a>
+        <a href="/admin/webhooks/simulator" class="btn btn-simulator">🧪 Webhook Simulator</a>
+        <a href="/admin/webhook-deliveries" class="btn btn-deliveries">📤 All Deliveries</a>
+    </div>
 
     <table>
         <thead>
             <tr>
+                <th>ID</th>
                 <th>Name</th>
                 <th>URL</th>
-                <th>Event</th>
+                <th>Event Type</th>
                 <th>Status</th>
-                <th>Retry</th>
+                <th>Created</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr th:each="w : ${webhooks}">
-                <td th:text="${w.name}">Webhook 1</td>
-                <td th:text="${w.url}">https://example.com</td>
-                <td th:text="${w.eventType}">TRANSACTION_SETTLED</td>
+            <tr th:each="config : ${webhooks}" th:if="${config != null}">
+                <td th:text="${config.id}">1</td>
+                <td th:text="${config.name}">My Webhook</td>
+                <td th:text="${config.url}">https://example.com</td>
+                <td th:text="${config.eventType}">TRANSACTION_SETTLED</td>
                 <td>
-                    <span class="badge" th:classappend="${w.active ? 'badge-active' : 'badge-inactive'}"
-                          th:text="${w.active ? 'Active' : 'Inactive'}">
-                    </span>
+                    <span class="badge" th:classappend="${config.active ? 'badge-active' : 'badge-inactive'}"
+                          th:text="${config.active ? '✅ Active' : '❌ Inactive'}">Active</span>
                 </td>
-                <td th:text="${w.retryEnabled ? 'Yes' : 'No'}">Yes</td>
-                <td class="actions">
-                    <a th:href="@{/admin/webhooks/{id}/edit(id=${w.id})}" class="btn btn-edit">✏️ Edit</a>
-                    <form method="post" th:action="@{/admin/webhooks/{id}/toggle(id=${w.id})}" style="display:inline;">
-                        <button type="submit" class="btn btn-toggle"
-                                onclick="return confirm('Toggle this webhook?')"
-                                th:text="${w.active ? 'Deactivate' : 'Activate'}">
-                        </button>
-                    </form>
-                    <form method="post" th:action="@{/admin/webhooks/{id}/delete(id=${w.id})}" style="display:inline;">
-                        <button type="submit" class="btn btn-delete"
-                                onclick="return confirm('Delete this webhook?')">
-                            🗑️
-                        </button>
-                    </form>
+                <td th:text="${config.createdAt}">2026-01-01</td>
+                <td>
+                    <div class="actions-row">
+                        <a th:href="@{/admin/webhooks/{id}/edit(id=${config.id})}" class="btn btn-edit">Edit</a>
+                        <a th:href="@{/admin/webhooks/{id}/toggle(id=${config.id})}" class="btn btn-toggle">Toggle</a>
+                        <a th:href="@{/admin/webhooks/{id}/delete(id=${config.id})}" class="btn btn-delete" onclick="return confirm('Delete this webhook?')">Delete</a>
+                        <a th:href="@{/admin/webhook-deliveries(configId=${config.id})}" class="btn btn-deliveries">Deliveries</a>
+                    </div>
                 </td>
-            </tr>
-            <tr th:if="${webhooks.empty}">
-                <td colspan="6">No webhooks configured.</td>
             </tr>
         </tbody>
     </table>
+
+    <div th:if="${webhooks.empty}" style="text-align:center; color:#888; padding:20px;">
+        No webhooks configured.
+    </div>
+</div>
 </body>
 </html>

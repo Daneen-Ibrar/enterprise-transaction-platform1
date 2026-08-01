@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Bulk Actions</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin: 30px 0; border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+        .section h2 { margin-top: 0; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; }
+        .btn-primary { background: #2d7a3a; }
+        .btn-danger { background: #c0392b; }
+        .btn-warning { background: #f39c12; }
+        .btn-secondary { background: #6c757d; }
+        .btn:hover { opacity: 0.8; }
+        .progress-container { width: 100%; background: #f3f3f3; border-radius: 4px; margin: 10px 0; display: none; }
+        .progress-bar { width: 0%; height: 20px; background: #2d7a3a; border-radius: 4px; text-align: center; color: white; line-height: 20px; }
+        #jobStatus { margin: 10px 0; }
+        .job-summary { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; display: none; }
+        .badge { padding: 2px 8px; border-radius: 12px; color: white; }
+        .badge-success { background: #2d7a3a; }
+        .badge-failure { background: #c0392b; }
+    </style>
+</head>
+<body>
+    <h1>⚡ Bulk Actions</h1>
+    <a href="/dashboard">← Back to Dashboard</a>
+
+    <div class="section">
+        <h2>📋 Pending Invoices</h2>
+        <form id="bulkForm" onsubmit="return submitBulk(event)">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAllInvoices" onclick="toggleAll('invoice')"/></th>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Risk</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="inv : ${pendingInvoices}">
+                        <td><input type="checkbox" class="invoice-checkbox" th:value="${inv.id}"/></td>
+                        <td th:text="${inv.id}">1</td>
+                        <td th:text="${inv.customerEmail}">customer@test.com</td>
+                        <td th:text="${inv.amount}">100.00</td>
+                        <td th:text="${inv.riskLevel}">GREEN</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-primary" onclick="submitBulkAction('APPROVE')">Approve Selected</button>
+                <button type="button" class="btn btn-danger" onclick="submitBulkAction('REJECT')">Reject Selected</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>💸 Settled Transactions (for Refund)</h2>
+        <form id="refundForm" onsubmit="return submitRefund(event)">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAllTransactions" onclick="toggleAll('transaction')"/></th>
+                        <th>ID</th>
+                        <th>Invoice</th>
+                        <th>Amount</th>
+                        <th>Currency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="tx : ${settledTransactions}">
+                        <td><input type="checkbox" class="transaction-checkbox" th:value="${tx.id}"/></td>
+                        <td th:text="${tx.id}">1</td>
+                        <td th:text="${tx.invoiceId}">100</td>
+                        <td th:text="${tx.amount}">100.00</td>
+                        <td th:text="${tx.currency}">GBP</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-warning" onclick="submitBulkAction('REFUND')">Refund Selected</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Progress Bar -->
+    <div id="progressContainer" class="progress-container">
+        <div id="progressBar" class="progress-bar" style="width:0%;">0%</div>
+    </div>
+    <div id="jobStatus"></div>
+    <div id="jobSummary" class="job-summary"></div>
+
+    <script>
+        let currentJobId = null;
+        let pollingInterval = null;
+
+        function toggleAll(type) {
+            const checkboxes = document.querySelectorAll(type === 'invoice' ? '.invoice-checkbox' : '.transaction-checkbox');
+            const selectAll = document.getElementById(type === 'invoice' ? 'selectAllInvoices' : 'selectAllTransactions');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+
+        function getSelectedIds(type) {
+            const checkboxes = document.querySelectorAll(type === 'invoice' ? '.invoice-checkbox' : '.transaction-checkbox');
+            const ids = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) ids.push(parseInt(cb.value, 10));
+            });
+            return ids;
+        }
+
+        function submitBulkAction(action) {
+            let ids = [];
+            let endpoint = '';
+            if (action === 'APPROVE' || action === 'REJECT') {
+                ids = getSelectedIds('invoice');
+                endpoint = action === 'APPROVE' ? '/admin/bulk/approve-invoices' : '/admin/bulk/reject-invoices';
+            } else if (action === 'REFUND') {
+                ids = getSelectedIds('transaction');
+                endpoint = '/admin/bulk/refund-transactions';
+            }
+
+            if (ids.length === 0) {
+                alert('Please select at least one item.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to ${action} ${ids.length} item(s)?`)) {
+                return;
+            }
+
+            // Show progress
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressBar').textContent = '0%';
+            document.getElementById('jobStatus').textContent = 'Submitting job...';
+            document.getElementById('jobSummary').style.display = 'none';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ids)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => { throw new Error(text); });
+                }
+                return response.json();
+            })
+            .then(job => {
+                if (!job || !job.id) {
+                    throw new Error('Invalid job response: ' + JSON.stringify(job));
+                }
+                currentJobId = job.id;
+                document.getElementById('jobStatus').textContent = `Job started (ID: ${job.id})`;
+                if (pollingInterval) clearInterval(pollingInterval);
+                pollingInterval = setInterval(pollJobStatus, 1000);
+            })
+            .catch(err => {
+                document.getElementById('jobStatus').textContent = '❌ Error: ' + err.message;
+                document.getElementById('progressContainer').style.display = 'none';
+                console.error('Bulk job submission error:', err);
+            });
+        }
+
+        function pollJobStatus() {
+            if (!currentJobId) return;
+            fetch(`/admin/bulk/jobs/${currentJobId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch job status');
+                    return response.json();
+                })
+                .then(job => {
+                    const progress = job.totalItems > 0 ? Math.round((job.processedItems / job.totalItems) * 100) : 0;
+                    document.getElementById('progressBar').style.width = progress + '%';
+                    document.getElementById('progressBar').textContent = progress + '%';
+
+                    if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        const summaryDiv = document.getElementById('jobSummary');
+                        summaryDiv.style.display = 'block';
+                        summaryDiv.innerHTML = `
+                            <h4>Job ${job.status}</h4>
+                            <p><strong>Total:</strong> ${job.totalItems}</p>
+                            <p><strong>Success:</strong> <span class="badge badge-success">${job.successCount}</span></p>
+                            <p><strong>Failed:</strong> <span class="badge badge-failure">${job.failureCount}</span></p>
+                            <p><strong>Result:</strong> ${job.resultSummary || 'N/A'}</p>
+                            ${job.errorDetails ? `<p><strong>Errors:</strong><pre>${job.errorDetails}</pre></p>` : ''}
+                        `;
+                        document.getElementById('jobStatus').textContent = `✅ Job ${job.status}`;
+                    }
+                })
+                .catch(err => {
+                    console.error('Polling error:', err);
+                    if (pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        document.getElementById('jobStatus').textContent = '❌ Error polling job status: ' + err.message;
+                    }
+                });
+        }
+    </script>
+</body>
+</html>

@@ -58,6 +58,17 @@ public class CustomAuthenticationSuccessHandler extends SavedRequestAwareAuthent
                         request
                 );
 
+                // ===== ENFORCE 2FA FOR ADMIN USERS =====
+                boolean isAdmin = user.getRoles().stream()
+                        .anyMatch(r -> r.getName().equals("ADMIN"));
+          if (isAdmin && !user.isTwoFactorEnabled()) {
+    log.info("🔐 Admin user {} must set up 2FA – redirecting to setup", email);
+    HttpSession session = request.getSession();
+    session.setAttribute("2FA_REQUIRED", true);
+    getRedirectStrategy().sendRedirect(request, response, "/2fa/setup?required=true");
+    return;
+}
+
                 if (user.isTwoFactorEnabled()) {
                     HttpSession session = request.getSession();
                     session.setAttribute("2FA_PENDING", true);
@@ -67,8 +78,7 @@ public class CustomAuthenticationSuccessHandler extends SavedRequestAwareAuthent
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error in CustomAuthenticationSuccessHandler: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error in CustomAuthenticationSuccessHandler", e);
         }
 
         super.onAuthenticationSuccess(request, response, authentication);

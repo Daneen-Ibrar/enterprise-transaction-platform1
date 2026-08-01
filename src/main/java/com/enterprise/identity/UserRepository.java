@@ -11,7 +11,16 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<AppUser, Long> {
+
     Optional<AppUser> findByEmail(String email);
+
+    // Case‑insensitive (respects tenant filter)
+    @Query("SELECT u FROM AppUser u WHERE LOWER(u.email) = LOWER(:email)")
+    Optional<AppUser> findByEmailIgnoreCase(@Param("email") String email);
+
+    // ✅ NEW: Bypass tenant filter for impersonation (native query)
+    @Query(value = "SELECT * FROM app_user WHERE LOWER(email) = LOWER(:email)", nativeQuery = true)
+    Optional<AppUser> findByEmailIgnoreCaseGlobal(@Param("email") String email);
 
     List<AppUser> findByRolesName(String roleName);
 

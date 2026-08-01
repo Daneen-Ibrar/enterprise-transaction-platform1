@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Transaction Timeline</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .transaction-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #ddd; }
+        .event { position: relative; margin-bottom: 20px; padding-left: 20px; }
+        .event::before { content: ''; position: absolute; left: -6px; top: 5px; width: 14px; height: 14px; border-radius: 50%; background: #2d7a3a; border: 2px solid white; box-shadow: 0 0 0 2px #2d7a3a; }
+        .event .time { font-size: 0.85em; color: #888; }
+        .event .details { background: #f1f1f1; padding: 10px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 0.9em; }
+        .event .badge { padding: 2px 8px; border-radius: 12px; color: white; font-size: 0.75em; display: inline-block; margin-left: 10px; }
+        .badge-transaction_created { background: #3498db; }
+        .badge-transaction_pending { background: #3498db; }
+        .badge-transaction_authorised { background: #f39c12; }
+        .badge-transaction_settled { background: #2d7a3a; }
+        .badge-transaction_refunded { background: #8e44ad; }
+        .badge-transaction_failed { background: #c0392b; }
+        .badge-payment_settled { background: #2d7a3a; }
+        .badge-invoice_created { background: #3498db; }
+        .badge-invoice_approved { background: #2d7a3a; }
+        .badge-invoice_rejected { background: #c0392b; }
+        /* fallback for unknown event types */
+        .badge-default { background: #6c757d; }
+        .btn { padding: 4px 10px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { opacity: 0.8; }
+        .back { display: inline-block; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Timeline for Transaction #<span th:text="${transaction.id}">1</span></h1>
+    <a href="/transactions" class="back">← Back to Transactions</a>
+
+    <div class="transaction-info">
+        <p><strong>Invoice:</strong> <span th:text="${transaction.invoiceId}">1</span></p>
+        <p><strong>Amount:</strong> <span th:text="${transaction.amount}">100.00</span> <span th:text="${transaction.currency}">GBP</span></p>
+        <p><strong>Status:</strong> <span th:text="${transaction.status}">SETTLED</span></p>
+    </div>
+
+    <div class="timeline">
+        <div th:each="event : ${events}" class="event">
+            <div class="time" th:text="${event.createdAt}">2026-01-01 12:00:00</div>
+            <div>
+                <strong th:text="${event.eventType}">PAYMENT_SETTLED</strong>
+                <!-- ✅ Use the raw event type with underscores to match CSS classes -->
+                <span class="badge" th:classappend="'badge-' + ${event.eventType.toLowerCase()}"> </span>
+            </div>
+            <div class="details" th:text="${event.details}">{"key":"value"}</div>
+        </div>
+        <div th:if="${events.empty}">
+            <p>No timeline events found for this transaction.</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

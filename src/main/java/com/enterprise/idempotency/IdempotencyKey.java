@@ -5,14 +5,13 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "idempotency_key")
-
 public class IdempotencyKey {
 
     @Id
     @Column(name = "key", nullable = false, unique = true)
     private String key;
 
-    @Column(columnDefinition = "JSONB", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String response;
 
     @Column(name = "created_at", updatable = false)
@@ -20,6 +19,12 @@ public class IdempotencyKey {
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
+
+    @Column(name = "request_fingerprint", length = 64)
+    private String requestFingerprint;
+
+    @Column(name = "tenant_id", nullable = false)   // <-- new field
+    private Long tenantId;
 
     // Constructors
     public IdempotencyKey() {}
@@ -33,10 +38,19 @@ public class IdempotencyKey {
     // Getters and setters
     public String getKey() { return key; }
     public void setKey(String key) { this.key = key; }
+
     public String getResponse() { return response; }
     public void setResponse(String response) { this.response = response; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     public LocalDateTime getExpiresAt() { return expiresAt; }
     public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
+
+    public String getRequestFingerprint() { return requestFingerprint; }
+    public void setRequestFingerprint(String requestFingerprint) { this.requestFingerprint = requestFingerprint; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

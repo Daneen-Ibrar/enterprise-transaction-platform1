@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Failure Classification Rule</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1f2937; margin-top: 0; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; color: #374151; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; }
+        input[type="checkbox"] { margin-right: 8px; }
+        .btn { display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-test { background: #8b5cf6; color: white; }
+        .btn-test:hover { background: #7c3aed; }
+        .actions { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; }
+        .checkbox-group label { margin: 0; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { padding: 12px 20px; margin-bottom: 10px; border-radius: 8px; color: white; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 1; transition: opacity 0.3s ease; max-width: 400px; }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        .toast.hide { opacity: 0; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .help-icon { cursor: pointer; color: #2563eb; font-weight: bold; margin-left: 8px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+        .modal-content { background: white; max-width: 600px; margin: 80px auto; padding: 24px; border-radius: 8px; max-height: 80vh; overflow-y: auto; }
+        .modal-content h2 { margin-top: 0; }
+        .modal-content code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        .modal-content .example { background: #f9fafb; padding: 8px 12px; border-radius: 4px; margin: 8px 0; border-left: 3px solid #2563eb; }
+        .test-result { margin-top: 8px; padding: 8px 12px; border-radius: 4px; display: none; }
+        .test-result.success { background: #d1fae5; color: #065f46; display: block; }
+        .test-result.error { background: #fee2e2; color: #991b1b; display: block; }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container" class="toast-container">
+        <div th:if="${success}" class="toast toast-success" th:text="${success}"></div>
+        <div th:if="${error}" class="toast toast-error" th:text="${error}"></div>
+    </div>
+
+    <div class="container">
+        <h1 th:if="${rule.id == null}">Create Failure Classification Rule</h1>
+        <h1 th:if="${rule.id != null}">Edit Failure Classification Rule</h1>
+
+        <form th:action="${rule.id == null} ? '/admin/reliability/policies/failure-classification' : '/admin/reliability/policies/failure-classification/' + ${rule.id}" method="post" id="ruleForm">
+            <input type="hidden" name="id" th:value="${rule.id}">
+
+            <div class="form-group">
+                <label>Priority <span style="color:red;">*</span></label>
+                <input type="number" name="priority" th:value="${rule.priority}" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    Condition Expression (SpEL)
+                    <span class="help-icon" onclick="document.getElementById('helpModal').style.display='block'">ⓘ</span>
+                    <span style="color:red;">*</span>
+                </label>
+                <input type="text" name="conditionExpression" id="expressionInput" 
+                       th:value="${rule.conditionExpression}" 
+                       placeholder="#message.contains('timeout')" 
+                       required style="width:100%;">
+                <div style="margin-top:4px;">
+       
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Category <span style="color:red;">*</span></label>
+                <select name="category" required>
+                    <option value="">— Select —</option>
+                    <option value="TRANSIENT" th:selected="${rule.category == 'TRANSIENT'}">Transient</option>
+                    <option value="PERMANENT" th:selected="${rule.category == 'PERMANENT'}">Permanent</option>
+                    <option value="VALIDATION" th:selected="${rule.category == 'VALIDATION'}">Validation</option>
+                    <option value="INFRASTRUCTURE" th:selected="${rule.category == 'INFRASTRUCTURE'}">Infrastructure</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Severity <span style="color:red;">*</span></label>
+                <select name="severity" required>
+                    <option value="">— Select —</option>
+                    <option value="LOW" th:selected="${rule.severity == 'LOW'}">Low</option>
+                    <option value="MEDIUM" th:selected="${rule.severity == 'MEDIUM'}">Medium</option>
+                    <option value="HIGH" th:selected="${rule.severity == 'HIGH'}">High</option>
+                    <option value="CRITICAL" th:selected="${rule.severity == 'CRITICAL'}">Critical</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Action <span style="color:red;">*</span></label>
+                <select name="action" required>
+                    <option value="">— Select —</option>
+                    <option value="RETRY" th:selected="${rule.action == 'RETRY'}">Retry</option>
+                    <option value="ROLLBACK" th:selected="${rule.action == 'ROLLBACK'}">Rollback</option>
+                    <option value="DLQ" th:selected="${rule.action == 'DLQ'}">DLQ</option>
+                    <option value="IGNORE" th:selected="${rule.action == 'IGNORE'}">Ignore</option>
+                </select>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="active" th:checked="${rule.active}">
+                <label>Active</label>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="/admin/reliability/policies/failure-classification" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- ===== HELP MODAL ===== -->
+    <div id="helpModal" class="modal" onclick="if(event.target===this) document.getElementById('helpModal').style.display='none'">
+        <div class="modal-content">
+            <h2>SpEL Expression Help</h2>
+            <p>Write a condition that returns <code>true</code> or <code>false</code>.</p>
+
+            <h3>Available Variables</h3>
+            <ul>
+                <li><code>#message</code> – the error message (String)</li>
+                <li><code>#amount</code> – transaction amount (BigDecimal)</li>
+                <li><code>#customerEmail</code> – customer email (String)</li>
+                <li><code>#merchantId</code> – merchant ID (Long)</li>
+                <li><code>#description</code> – invoice description (String)</li>
+            </ul>
+
+            <h3>Examples</h3>
+            <div class="example">
+                <code>#message.contains("timeout")</code> → matches if error message contains "timeout"
+            </div>
+            <div class="example">
+                <code>#amount > 1000</code> → matches if amount > 1000
+            </div>
+            <div class="example">
+                <code>#description.toLowerCase().contains("urgent")</code> → case-insensitive match
+            </div>
+
+            <h3>Operators</h3>
+            <p><code>&&</code> (AND), <code>||</code> (OR), <code>!</code> (NOT), <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code></p>
+
+            <button class="btn btn-secondary" onclick="document.getElementById('helpModal').style.display='none'">Close</button>
+        </div>
+    </div>
+
+    <script>
+        function testExpression() {
+            const expr = document.getElementById('expressionInput').value;
+            const resultEl = document.getElementById('testResult');
+            if (!expr.trim()) {
+                resultEl.className = 'test-result error';
+                resultEl.textContent = 'Please enter an expression first.';
+                resultEl.style.display = 'block';
+                return;
+            }
+            // Determine policy type from the URL (failure-classification)
+            // We'll use 'RETRY' as the context type, but it doesn't matter much
+            fetch('/admin/reliability/test-expression?expression=' + encodeURIComponent(expr) + '&policyType=RETRY', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                resultEl.className = 'test-result ' + (data.valid ? 'success' : 'error');
+                resultEl.textContent = data.message;
+                resultEl.style.display = 'block';
+            })
+            .catch(err => {
+                resultEl.className = 'test-result error';
+                resultEl.textContent = 'Error testing expression: ' + err.message;
+                resultEl.style.display = 'block';
+            });
+        }
+
+        // Auto-hide toasts
+        document.addEventListener('DOMContentLoaded', function() {
+            const toasts = document.querySelectorAll('.toast');
+            toasts.forEach(function(toast, index) {
+                setTimeout(function() {
+                    toast.classList.add('hide');
+                    setTimeout(function() { toast.remove(); }, 300);
+                }, 4000 + (index * 500));
+            });
+        });
+    </script>
+</body>
+</html>

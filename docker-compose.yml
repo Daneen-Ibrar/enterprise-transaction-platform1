@@ -31,7 +31,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -44,7 +44,7 @@ services:
   app:
     build: .
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,6 +55,7 @@ services:
       SPRING_DATASOURCE_USERNAME: platform_user
       SPRING_DATASOURCE_PASSWORD: dev_password
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       SERVER_FORWARD_HEADERS_STRATEGY: native
       TEST_CUSTOMER_EMAIL: customer@test.com
       TEST_CUSTOMER_PASSWORD: password123
@@ -64,9 +65,14 @@ services:
       TEST_ADMIN_PASSWORD: password123
       TEST_AUDITOR_EMAIL: auditor@test.com
       TEST_AUDITOR_PASSWORD: password123
+      # Gmail SMTP
+      APP_EMAIL_MODE: smtp
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
       MAIL_USERNAME: daneen.ibrar@gmail.com
       MAIL_PASSWORD: rrakleuwvhmtanfz
-      APP_EMAIL_MODE: stub
+      MAIL_SMTP_AUTH: true
+      MAIL_STARTTLS: true
       JAVA_OPTS: "-Xmx512m -Xms256m -Dnetworkaddress.cache.ttl=10 -Dnetworkaddress.cache.negative.ttl=10"
     restart: unless-stopped
     deploy:

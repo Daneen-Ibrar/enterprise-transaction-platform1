@@ -25,7 +25,7 @@ public class ExcelExportService {
     public ByteArrayOutputStream generateReport(LocalDate startDate, LocalDate endDate) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Workbook workbook = new XSSFWorkbook()) {
-            // ----- Sheet 1: Summary -----
+            // Sheet 1: Summary
             Sheet summarySheet = workbook.createSheet("Summary");
             int rowNum = 0;
             Row row = summarySheet.createRow(rowNum++);
@@ -51,7 +51,7 @@ public class ExcelExportService {
                 r.createCell(1).setCellValue(pair[1].toString());
             }
 
-            // ----- Sheet 2: Transactions -----
+            // Sheet 2: Transactions
             Sheet txSheet = workbook.createSheet("Transactions");
             Row header = txSheet.createRow(0);
             String[] columns = {"ID", "Invoice", "Customer", "Merchant", "Amount", "Currency", "Status", "Created"};
@@ -73,7 +73,6 @@ public class ExcelExportService {
                 r.createCell(7).setCellValue(tx.getCreatedAt().toString());
             }
 
-            // Auto-size columns
             for (int i = 0; i < columns.length; i++) {
                 txSheet.autoSizeColumn(i);
             }

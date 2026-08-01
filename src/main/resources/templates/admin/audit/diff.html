@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Audit Diff</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .diff-table { border-collapse: collapse; width: 100%; }
+        .diff-table th, .diff-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .diff-table th { background: #f2f2f2; }
+        .added { background: #d4edda; }
+        .removed { background: #f8d7da; }
+        .changed { background: #fff3cd; }
+        .back { margin-bottom: 20px; display: inline-block; }
+        .error { color: #c0392b; background: #f8d7da; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <a href="/admin/audit" class="back">← Back to Audit Events</a>
+    <h1>Diff for Event #<span th:text="${event.id}">1</span></h1>
+    <p><strong>Event Type:</strong> <span th:text="${event.eventType}">PAYMENT_SETTLED</span></p>
+    <p><strong>Entity:</strong> <span th:text="${event.entityType}">Invoice</span> #<span th:text="${event.entityId}">100</span></p>
+    <p><strong>User:</strong> <span th:text="${event.userId}">10</span></p>
+
+    <div th:if="${error}" class="error" th:text="${error}">Error message</div>
+
+    <div th:if="${diffs.empty and !error}">
+        <p>No changes detected (or snapshots unavailable).</p>
+    </div>
+
+    <table class="diff-table" th:unless="${diffs.empty}">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Change Type</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="diff : ${diffs}" th:classappend="${diff.type == 'added' ? 'added' : diff.type == 'removed' ? 'removed' : 'changed'}">
+                <td th:text="${diff.field}">amount</td>
+                <td th:text="${diff.type}">changed</td>
+                <td th:text="${diff.oldValue}">100.00</td>
+                <td th:text="${diff.newValue}">200.00</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

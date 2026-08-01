@@ -4,7 +4,6 @@ public class TenantContext {
     private static final ThreadLocal<Long> currentTenantId = new ThreadLocal<>();
 
     public static void setTenantId(Long tenantId) {
-        // Allow null for background jobs and system operations
         if (tenantId != null) {
             currentTenantId.set(tenantId);
         } else {

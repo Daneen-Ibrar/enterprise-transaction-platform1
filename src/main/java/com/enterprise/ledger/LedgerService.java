@@ -26,7 +26,7 @@ public class LedgerService {
         BigDecimal newBalance = current.subtract(amount);
         LedgerEntry entry = new LedgerEntry(transactionId, EntryType.DEBIT, amount, newBalance);
         entry.setAccountId(accountId);
-        entry.setTenantId(TenantContext.getTenantId() != null ? TenantContext.getTenantId() : 1L);
+        entry.setTenantId(TenantContext.getRequiredTenantId());
         ledgerRepository.save(entry);
         log.info("Debit recorded: account={}, amount={}, newBalance={}, txId={}",
                 accountId, amount, newBalance, transactionId);
@@ -38,7 +38,7 @@ public class LedgerService {
         BigDecimal newBalance = current.add(amount);
         LedgerEntry entry = new LedgerEntry(transactionId, EntryType.CREDIT, amount, newBalance);
         entry.setAccountId(accountId);
-        entry.setTenantId(TenantContext.getTenantId() != null ? TenantContext.getTenantId() : 1L);
+        entry.setTenantId(TenantContext.getRequiredTenantId());
         ledgerRepository.save(entry);
         log.info("Credit recorded: account={}, amount={}, newBalance={}, txId={}",
                 accountId, amount, newBalance, transactionId);
@@ -57,18 +57,36 @@ public class LedgerService {
         return balance;
     }
 
-    // For reconciliation – fetch all entries with optional tenant filter (handled by Hibernate)
+    // ===== BALANCED LEDGER CHECK =====
+    public void validateTransactionBalance(Long transactionId) {
+        List<LedgerEntry> entries = ledgerRepository.findByTransactionId(transactionId);
+        BigDecimal totalDebit = BigDecimal.ZERO;
+        BigDecimal totalCredit = BigDecimal.ZERO;
+        for (LedgerEntry entry : entries) {
+            if (EntryType.DEBIT.equals(entry.getEntryType())) {
+                totalDebit = totalDebit.add(entry.getAmount());
+            } else {
+                totalCredit = totalCredit.add(entry.getAmount());
+            }
+        }
+        if (totalDebit.compareTo(totalCredit) != 0) {
+            throw new IllegalStateException(
+                String.format("Balanced ledger violation: total debit %s != total credit %s for tx %d",
+                    totalDebit, totalCredit, transactionId)
+            );
+        }
+    }
+
+    // For reconciliation
     public List<LedgerEntry> getAllEntries() {
         return ledgerRepository.findAll();
     }
 
-    // Rollback / reversal: create compensating entries
+    // Rollback / reversal
     @Transactional
     public void reverseTransaction(Long transactionId, BigDecimal amount, Long accountId) {
-        // Find existing entries for this transaction
         List<LedgerEntry> entries = ledgerRepository.findByTransactionId(transactionId);
         for (LedgerEntry entry : entries) {
-            // Create opposite entry to reverse
             EntryType opposite = entry.getEntryType() == EntryType.DEBIT ? EntryType.CREDIT : EntryType.DEBIT;
             LedgerEntry reverseEntry = new LedgerEntry(transactionId, opposite, entry.getAmount(), getBalance(accountId));
             reverseEntry.setAccountId(accountId);

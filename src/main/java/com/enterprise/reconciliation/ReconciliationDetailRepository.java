@@ -5,4 +5,5 @@ import java.util.List;
 
 public interface ReconciliationDetailRepository extends JpaRepository<ReconciliationDetail, Long> {
     List<ReconciliationDetail> findByReconciliationRecordId(Long recordId);
+    List<ReconciliationDetail> findByReconciliationRecordIdAndDiscrepancyType(Long recordId, String discrepancyType);
 }

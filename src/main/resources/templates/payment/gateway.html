@@ -143,10 +143,11 @@
         <p><strong>Invoice #<span th:text="${invoice.id}">1</span></strong></p>
         <p>Merchant: <span th:text="${invoice.merchantId}">2</span></p>
         <p>Description: <span th:text="${invoice.description}">Test</span></p>
-        <p class="amount">Total: £<span th:text="${invoice.amount}">100.00</span></p>
+        <p class="amount">Total: <span th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£ 100.00</span></p>
     </div>
 
     <form id="paymentForm" method="post" th:action="@{/pay/{id}(id=${invoice.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}"/>
 
         <div class="card-field">
@@ -171,7 +172,7 @@
         <div class="card-brand">Accepted: Visa · Mastercard · Amex</div>
 
         <button type="submit" class="btn-pay" id="payBtn">
-            <span id="btnText">Pay £<span th:text="${invoice.amount}">100.00</span></span>
+            <span id="btnText">Pay <span th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£ 100.00</span></span>
             <span class="spinner" id="spinner"></span>
         </button>
     </form>

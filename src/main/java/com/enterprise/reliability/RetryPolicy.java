@@ -17,7 +17,7 @@ public class RetryPolicy {
     private int maxAttempts;
 
     @Column(name = "backoff_strategy", nullable = false)
-    private String backoffStrategy; // FIXED, LINEAR, EXPONENTIAL
+    private String backoffStrategy;
 
     @Column(name = "base_delay_ms", nullable = false)
     private long baseDelayMs;
@@ -37,25 +37,41 @@ public class RetryPolicy {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    // ----- TENANT ID -----
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
     public String getOperationType() { return operationType; }
     public void setOperationType(String operationType) { this.operationType = operationType; }
+
     public int getMaxAttempts() { return maxAttempts; }
     public void setMaxAttempts(int maxAttempts) { this.maxAttempts = maxAttempts; }
+
     public String getBackoffStrategy() { return backoffStrategy; }
     public void setBackoffStrategy(String backoffStrategy) { this.backoffStrategy = backoffStrategy; }
+
     public long getBaseDelayMs() { return baseDelayMs; }
     public void setBaseDelayMs(long baseDelayMs) { this.baseDelayMs = baseDelayMs; }
+
     public long getMaxDelayMs() { return maxDelayMs; }
     public void setMaxDelayMs(long maxDelayMs) { this.maxDelayMs = maxDelayMs; }
+
     public boolean isJitterEnabled() { return jitterEnabled; }
     public void setJitterEnabled(boolean jitterEnabled) { this.jitterEnabled = jitterEnabled; }
+
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

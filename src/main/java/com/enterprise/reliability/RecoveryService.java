@@ -2,6 +2,7 @@ package com.enterprise.reliability;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,6 @@ public class RecoveryService {
         this.objectMapper = objectMapper;
     }
 
-    // No @Transactional here – the aspect wraps the original transactional method
     public Object executeWithRetry(String operationType, Supplier<Object> action, Map<String, Object> context) {
         RetryPolicy retryPolicy = policyService.getRetryPolicy(operationType);
         int attempts = 0;
@@ -38,7 +38,7 @@ public class RecoveryService {
 
         while (attempts < retryPolicy.getMaxAttempts()) {
             try {
-                // Check circuit breaker
+                // Check circuit breaker (tenant-aware)
                 CircuitBreakerState cbState = policyService.getCircuitBreakerState(operationType);
                 if ("OPEN".equals(cbState.getState())) {
                     CircuitBreakerPolicy cbPolicy = policyService.getCircuitBreakerPolicy(operationType);
@@ -56,15 +56,15 @@ public class RecoveryService {
                 // On success: reset circuit breaker
                 CircuitBreakerState state = policyService.getCircuitBreakerState(operationType);
                 if ("HALF_OPEN".equals(state.getState())) {
-                    state.setSuccessCount(state.getSuccessCount() + 1);
+                    policyService.incrementSuccessCount(operationType);
                     CircuitBreakerPolicy cbPolicy = policyService.getCircuitBreakerPolicy(operationType);
                     if (state.getSuccessCount() >= cbPolicy.getSuccessThreshold()) {
                         state.setState("CLOSED");
                         state.setFailureCount(0);
                         state.setSuccessCount(0);
+                        cbStateRepository.save(state);
                         log.info("Circuit breaker closed for {}", operationType);
                     }
-                    cbStateRepository.save(state);
                 }
                 return result;
 
@@ -85,6 +85,8 @@ public class RecoveryService {
                     sendToDlq(operationType, context, e);
                     throw new RuntimeException("Operation sent to DLQ", e);
                 } else if ("RETRY".equals(ruleAction)) {
+                    // Record failure in circuit breaker (tenant-aware)
+                    policyService.incrementFailureCount(operationType);
                     long delay = calculateBackoff(retryPolicy, attempts);
                     try {
                         Thread.sleep(delay);
@@ -125,8 +127,13 @@ public class RecoveryService {
             entry.setPayload(payload);
             entry.setFailureReason(e.getMessage());
             entry.setStatus("PENDING");
+            Long tenantId = TenantContext.getTenantId();
+            if (tenantId == null) {
+                tenantId = TenantContext.getRequiredTenantId();
+            }
+            entry.setTenantId(tenantId);
             dlqEntryRepository.save(entry);
-            log.info("Operation {} sent to DLQ", operationType);
+            log.info("Operation {} sent to DLQ for tenant {}", operationType, tenantId);
         } catch (JsonProcessingException ex) {
             log.error("Failed to serialize payload for DLQ", ex);
         }

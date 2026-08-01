@@ -46,9 +46,8 @@ public class AdminWebhookController {
     public String createWebhook(@ModelAttribute WebhookConfig webhook,
                                 RedirectAttributes redirectAttributes) {
         webhook.setCreatedAt(LocalDateTime.now());
-        // ----- FIX: Set tenant ID -----
-        Long tenantId = TenantContext.getTenantId();
-        webhook.setTenantId(tenantId != null ? tenantId : 1L);
+        // ✅ FIX: Set tenant ID – fail closed
+        webhook.setTenantId(TenantContext.getRequiredTenantId());
         webhookRepository.save(webhook);
         redirectAttributes.addFlashAttribute("success", "Webhook created.");
         return "redirect:/admin/webhooks";

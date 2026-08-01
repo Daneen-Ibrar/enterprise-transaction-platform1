@@ -27,14 +27,12 @@
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required minlength="6" />
 
-        <label>Roles:</label>
-        <div class="checkbox-group">
-            <div th:each="role : ${allRoles}">
-                <input type="checkbox" th:id="'role_' + ${role.id}" th:name="roleIds" th:value="${role.id}" />
-                <label th:for="'role_' + ${role.id}" th:text="${role.name}">ROLE</label>
-            </div>
-        </div>
-        <p style="font-size: 0.8em; color: #888;">If no role selected, user will be assigned CUSTOMER.</p>
+   
+ <label for="roles">Roles:</label>
+<select id="roles" name="roleIds" multiple style="width: 100%; max-width: 400px; padding: 8px; height: 120px;">
+    <option th:each="role : ${allRoles}" th:value="${role.id}" th:text="${role.name}">ROLE</option>
+</select>
+
 
         <!-- Tenant: dropdown for super admin, read-only for others -->
         <div th:if="${isSuperAdmin}">

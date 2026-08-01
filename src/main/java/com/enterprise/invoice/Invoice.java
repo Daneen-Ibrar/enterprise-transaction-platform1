@@ -47,15 +47,23 @@ public class Invoice {
     @Column(name = "suspicion_reason", columnDefinition = "TEXT")
     private String suspicionReason;
 
-    // ----- TENANT ID -----
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
-@Version
-@Column(name = "version", nullable = false)
-private Long version = 0L;
 
-public Long getVersion() { return version; }
-public void setVersion(Long version) { this.version = version; }
+    // ===== NEW FIELDS =====
+    @Column(name = "woo_order_id")
+    private Long wooOrderId;
+
+    @Column(name = "webhook_url", columnDefinition = "TEXT")
+    private String webhookUrl;
+
+    @Column(name = "return_url", columnDefinition = "TEXT")
+    private String returnUrl;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version = 0L;
+
     // Constructors
     public Invoice() {}
 
@@ -67,7 +75,7 @@ public void setVersion(Long version) { this.version = version; }
         this.status = "DRAFT";
     }
 
-    // Getters and setters
+    // Getters and setters (including new ones)
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -106,4 +114,17 @@ public void setVersion(Long version) { this.version = version; }
 
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
+
+    // NEW GETTERS/SETTERS
+    public Long getWooOrderId() { return wooOrderId; }
+    public void setWooOrderId(Long wooOrderId) { this.wooOrderId = wooOrderId; }
+
+    public String getWebhookUrl() { return webhookUrl; }
+    public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
+
+    public String getReturnUrl() { return returnUrl; }
+    public void setReturnUrl(String returnUrl) { this.returnUrl = returnUrl; }
 }

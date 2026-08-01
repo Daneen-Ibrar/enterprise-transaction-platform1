@@ -4,9 +4,10 @@ import com.enterprise.feature.FeatureFlagService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,7 +31,6 @@ public class SuspicionService {
     }
 
     public SuspicionResult evaluate(Invoice invoice) {
-        // ----- FEATURE FLAG CHECK -----
         if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
             log.debug("Suspicion detection is disabled – returning GREEN");
             return new SuspicionResult("GREEN", "Suspicion detection disabled");
@@ -44,7 +44,8 @@ public class SuspicionService {
         List<SuspicionRule> rules = ruleRepository.findByActiveTrueOrderByPriorityAsc();
         log.info("Rules count: {}", rules.size());
 
-        StandardEvaluationContext context = new StandardEvaluationContext();
+        // ✅ Use SimpleEvaluationContext – safe, read-only, no method calls
+        EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
         context.setVariable("amount", invoice.getAmount());
         context.setVariable("description", invoice.getDescription());
         context.setVariable("customerEmail", invoice.getCustomerEmail());
@@ -62,16 +63,14 @@ public class SuspicionService {
                 }
             } catch (Exception e) {
                 log.error("    ERROR: {}", e.getMessage());
+                // Fail secure: if rule evaluation fails, treat as GREEN (normal)
+                return new SuspicionResult("GREEN", "Rule evaluation error – defaulting to GREEN");
             }
         }
         log.info("No matches – returning GREEN");
         return new SuspicionResult("GREEN", "Normal invoice");
     }
 
-    /**
-     * Re‑evaluate all invoices after suspicion rules change.
-     * Delegates to InvoiceService to update all non‑paid invoices.
-     */
     public void reEvaluateAllInvoices() {
         invoiceService.reEvaluateAllInvoicesForSuspicion();
     }

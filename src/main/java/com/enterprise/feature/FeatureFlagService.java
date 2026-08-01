@@ -58,9 +58,8 @@ public class FeatureFlagService {
         flag.setDescription(description);
         flag.setEnabled(enabled);
         flag.setUpdatedAt(LocalDateTime.now());
-        // ----- FIX: Set tenant ID -----
-        Long tenantId = TenantContext.getTenantId();
-        flag.setTenantId(tenantId != null ? tenantId : 1L);
+        // ✅ FIX: Set tenant ID – fail closed
+        flag.setTenantId(TenantContext.getRequiredTenantId());
         return repository.save(flag);
     }
 

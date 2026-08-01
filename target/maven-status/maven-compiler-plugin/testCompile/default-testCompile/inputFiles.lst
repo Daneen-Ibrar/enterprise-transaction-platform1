@@ -6,5 +6,7 @@
 /workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/PaymentIntegrationTest.java
 /workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/PaymentInvariantTest.java
 /workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/integration/RefundIntegrationTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/test/ConcurrencyTest.java
+/workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/test/FailureInjectionTest.java
 /workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/transaction/TransactionIntegrationTest.java
 /workspaces/enterprise-transaction-platform1/src/test/java/com/enterprise/util/TestDataBuilder.java

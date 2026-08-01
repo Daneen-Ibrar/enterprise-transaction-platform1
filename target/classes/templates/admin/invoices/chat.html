@@ -20,6 +20,7 @@
     </div>
 
     <form method="post" th:action="@{/admin/invoices/{id}/messages(id=${invoice.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <textarea name="message" rows="3" style="width:100%;" placeholder="Type your reply here..." required></textarea>
         <br/>
         <button type="submit">Send Reply</button>

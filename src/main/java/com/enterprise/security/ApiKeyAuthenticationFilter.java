@@ -2,6 +2,7 @@ package com.enterprise.security;
 
 import com.enterprise.apikey.ApiKey;
 import com.enterprise.apikey.ApiKeyService;
+import com.enterprise.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,27 +34,38 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        if (!path.startsWith("/api/public")) {
+
+        // Skip non-API endpoints
+        if (!path.startsWith("/api/")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String apiKey = request.getHeader("X-API-Key");
-        log.debug("API Key received: {}", apiKey);
+        // Allow public API endpoints without key
+        if (path.startsWith("/api/public")) {
+            log.debug("Public API endpoint: {}", path);
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-        if (apiKey == null) {
+        // For all other /api/ endpoints, validate API key
+        String apiKey = request.getHeader("X-API-Key");
+        log.info("API Key received for protected endpoint: {}", path);
+
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            log.warn("Missing X-API-Key header for: {}", path);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"error\":\"Missing X-API-Key header\"}");
             response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Missing X-API-Key header\"}");
             return;
         }
 
         var keyOptional = apiKeyService.validateKey(apiKey);
         if (keyOptional.isEmpty()) {
-            log.warn("Invalid or inactive API Key: {}", apiKey);
+            log.warn("Invalid or inactive API Key for: {}", path);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"error\":\"Invalid or inactive API Key\"}");
             response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Invalid or inactive API Key\"}");
             return;
         }
 
@@ -68,7 +80,15 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         );
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        log.debug("API Key authenticated for user: {}", key.getUser().getEmail());
+        // ✅ Set tenant context for this request
+        if (key.getUser().getTenantId() != null) {
+            TenantContext.setTenantId(key.getUser().getTenantId());
+            log.debug("Tenant context set to: {}", key.getUser().getTenantId());
+        } else {
+            log.warn("API key user has no tenant ID: {}", key.getUser().getEmail());
+        }
+
+        log.info("API Key authenticated for user: {}", key.getUser().getEmail());
         filterChain.doFilter(request, response);
     }
 }

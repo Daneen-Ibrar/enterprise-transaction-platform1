@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Exchange Rate Form</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1f2937; margin-top: 0; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; color: #374151; }
+        select, input[type="number"] { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; }
+        .btn { display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+        .actions { margin-top: 20px; display: flex; gap: 12px; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .note { font-size: 14px; color: #6b7280; background: #f3f4f6; padding: 12px; border-radius: 4px; margin: 16px 0; }
+        .error { color: #dc2626; }
+        .error-msg { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 4px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div th:if="${error}" class="error-msg" th:text="${error}"></div>
+
+        <h1 th:if="${rate.id == null}">Create Exchange Rate</h1>
+        <h1 th:if="${rate.id != null}">Edit Exchange Rate</h1>
+
+        <form th:action="${rate.id == null} ? '/admin/exchange-rates' : '/admin/exchange-rates/' + ${rate.id}" method="post">
+            <input type="hidden" name="id" th:value="${rate.id}">
+
+            <div class="form-group">
+                <label>From Currency <span style="color:red;">*</span></label>
+                <select name="fromCurrency" required th:disabled="${rate.id != null}">
+                    <option value="">— Select —</option>
+                    <option th:each="c : ${currencies}" th:value="${c}" th:text="${c}" th:selected="${c == rate.fromCurrency}"></option>
+                </select>
+                <div class="note" th:if="${rate.id != null}">Currency pair cannot be changed after creation.</div>
+            </div>
+
+            <div class="form-group">
+                <label>To Currency <span style="color:red;">*</span></label>
+                <select name="toCurrency" required th:disabled="${rate.id != null}">
+                    <option value="">— Select —</option>
+                    <option th:each="c : ${currencies}" th:value="${c}" th:text="${c}" th:selected="${c == rate.toCurrency}"></option>
+                </select>
+                <div class="note" th:if="${rate.id != null}">Currency pair cannot be changed after creation.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Rate <span style="color:red;">*</span></label>
+                <input type="number" name="rate" th:value="${rate.rate}" step="0.000001" min="0.000001" required>
+                <div class="note">How many <span th:text="${rate.toCurrency}">USD</span> equals 1 <span th:text="${rate.fromCurrency}">GBP</span>.</div>
+            </div>
+
+            <div class="note">
+                <strong>ℹ️ Auto‑Inverse:</strong> 
+                The inverse rate (e.g., <span th:text="${rate.toCurrency}">USD</span> → <span th:text="${rate.fromCurrency}">GBP</span>) 
+                will be <strong>automatically created/updated</strong> when you save.
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="/admin/exchange-rates" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -10,7 +10,7 @@ public class CircuitBreakerState {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "operation_type", nullable = false, unique = true)
+    @Column(name = "operation_type", nullable = false)
     private String operationType;
 
     @Column(nullable = false)
@@ -34,6 +34,10 @@ public class CircuitBreakerState {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    // ===== TENANT ID =====
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -53,4 +57,6 @@ public class CircuitBreakerState {
     public void setOpenedAt(LocalDateTime openedAt) { this.openedAt = openedAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

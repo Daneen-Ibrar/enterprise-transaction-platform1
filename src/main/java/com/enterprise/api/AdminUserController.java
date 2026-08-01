@@ -7,6 +7,9 @@ import com.enterprise.identity.RoleRepository;
 import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
 import com.enterprise.tenant.TenantRepository;
+
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,13 +49,11 @@ public class AdminUserController {
         this.activityLogService = activityLogService;
     }
 
-    // Helper: get current admin
     private AppUser getCurrentAdmin(Authentication authentication) {
         return userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    // List users
     @GetMapping
     public String listUsers(@RequestParam(required = false) String search,
                             @RequestParam(required = false) String role,
@@ -96,6 +97,14 @@ public class AdminUserController {
         model.addAttribute("allRoles", roleRepository.findAll());
         model.addAttribute("isSuperAdmin", isSuperAdmin);
         return "admin/users/list";
+    }
+
+    @PostMapping("/{id}/impersonate")
+    public String impersonateUser(@PathVariable Long id, HttpServletRequest request) throws Exception {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String switchUrl = "/admin/users/impersonate?username=" + user.getEmail();
+        return "redirect:" + switchUrl;
     }
 
     @GetMapping("/create")
@@ -150,7 +159,6 @@ public class AdminUserController {
 
         userRepository.save(user);
 
-        // Log activity
         activityLogService.logActivity(
                 user.getId(),
                 "ACCOUNT_CREATED",
@@ -208,7 +216,6 @@ public class AdminUserController {
             throw new RuntimeException("You cannot edit users from other tenants.");
         }
 
-        // Capture old roles for audit
         Set<Role> oldRoles = new HashSet<>(user.getRoles());
 
         if (isSuperAdmin && tenantId != null) {
@@ -235,7 +242,6 @@ public class AdminUserController {
                         "Your account has been disabled by an administrator.",
                         "/login"
                 );
-                // Log revoke
                 activityLogService.logActivity(
                         user.getId(),
                         "ACCOUNT_REVOKED",
@@ -250,7 +256,6 @@ public class AdminUserController {
                         "Your account has been reactivated by an administrator.",
                         "/login"
                 );
-                // Log restore
                 activityLogService.logActivity(
                         user.getId(),
                         "ACCOUNT_RESTORED",
@@ -260,7 +265,6 @@ public class AdminUserController {
             }
         }
 
-        // Check role change
         if (!oldRoles.equals(user.getRoles())) {
             activityLogService.logActivity(
                     user.getId(),
@@ -276,9 +280,11 @@ public class AdminUserController {
         return "redirect:/admin/users";
     }
 
+    // ✅ FIXED: Revoke method now redirects with flash message
     @PostMapping("/revoke/{userId}")
-    @ResponseBody
-    public String revokeUserById(@PathVariable Long userId, Authentication authentication) {
+    public String revokeUserById(@PathVariable Long userId,
+                                 Authentication authentication,
+                                 RedirectAttributes redirectAttributes) {
         AppUser admin = getCurrentAdmin(authentication);
         boolean isSuperAdmin = admin.isSuperAdmin();
 
@@ -286,7 +292,8 @@ public class AdminUserController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!isSuperAdmin && !user.getTenantId().equals(admin.getTenantId())) {
-            return "You cannot revoke users from other tenants.";
+            redirectAttributes.addFlashAttribute("error", "You cannot revoke users from other tenants.");
+            return "redirect:/admin/users";
         }
 
         user.setActive(false);
@@ -305,7 +312,9 @@ public class AdminUserController {
                 "Account revoked by admin: " + admin.getEmail(),
                 null
         );
-        return "Merchant account revoked.";
+
+        redirectAttributes.addFlashAttribute("success", "User account revoked successfully.");
+        return "redirect:/admin/users";
     }
 
     @GetMapping("/restore")

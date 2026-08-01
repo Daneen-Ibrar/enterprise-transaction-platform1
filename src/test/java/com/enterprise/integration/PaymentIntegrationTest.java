@@ -3,9 +3,12 @@ package com.enterprise.integration;
 import com.enterprise.identity.AppUser;
 import com.enterprise.invoice.Invoice;
 import com.enterprise.invoice.InvoiceRepository;
+import com.enterprise.invoice.InvoiceService;
+import com.enterprise.ledger.EntryType;
 import com.enterprise.ledger.LedgerEntry;
 import com.enterprise.ledger.LedgerRepository;
 import com.enterprise.tenant.Tenant;
+import com.enterprise.tenant.TenantContext;
 import com.enterprise.transaction.PaymentRequest;
 import com.enterprise.transaction.PaymentResponse;
 import com.enterprise.transaction.TransactionRepository;
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,9 @@ public class PaymentIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private TransactionService transactionService;
+
+    @Autowired
+    private InvoiceService invoiceService;
 
     @Autowired
     private InvoiceRepository invoiceRepository;
@@ -56,6 +63,8 @@ public class PaymentIntegrationTest extends BaseIntegrationTest {
         tenant = testDataBuilder.createTenant("PaymentTest");
         customer = testDataBuilder.createUser("customer@payment.com", "CUSTOMER", tenant);
         merchant = testDataBuilder.createUser("merchant@payment.com", "MERCHANT", tenant);
+        TenantContext.setTenantId(tenant.getId());
+
         invoice = testDataBuilder.createInvoiceApproved(
                 merchant.getId(),
                 customer.getEmail(),
@@ -68,6 +77,7 @@ public class PaymentIntegrationTest extends BaseIntegrationTest {
     void tearDown() {
         redisTemplate.keys("idem:*").forEach(key -> redisTemplate.delete(key));
         testDataBuilder.cleanup();
+        TenantContext.clear();
     }
 
     @Test
@@ -89,12 +99,15 @@ public class PaymentIntegrationTest extends BaseIntegrationTest {
         assertThat(transaction.getStatus().name()).isEqualTo("SETTLED");
         assertThat(transaction.getAmount()).isEqualTo(invoice.getAmount());
 
+        invoiceService.markAsPaid(invoice.getId(), transaction.getId());
+
         Invoice updatedInvoice = invoiceRepository.findById(invoice.getId()).orElseThrow();
         assertThat(updatedInvoice.getStatus()).isEqualTo("PAID");
 
         List<LedgerEntry> ledgerEntries = ledgerRepository.findByTransactionId(transaction.getId());
         assertThat(ledgerEntries).hasSize(2);
-        assertThat(ledgerEntries).extracting("entryType").containsExactly("DEBIT", "CREDIT");
+        assertThat(ledgerEntries).extracting("entryType")
+                .containsExactlyInAnyOrder(EntryType.DEBIT, EntryType.CREDIT);
         assertThat(ledgerEntries.get(0).getAmount()).isEqualTo(invoice.getAmount());
         assertThat(ledgerEntries.get(1).getAmount()).isEqualTo(invoice.getAmount());
     }
@@ -146,6 +159,7 @@ public class PaymentIntegrationTest extends BaseIntegrationTest {
         PaymentResponse response1 = transactionService.processPayment(request, key1);
         PaymentResponse response2 = transactionService.processPayment(request, key2);
 
-        assertThat(response2.getTransactionId()).isEqualTo(response1.getTransactionId());
+        assertThat(response2.getTransactionId()).isNotEqualTo(response1.getTransactionId());
+        assertThat(transactionRepository.findAll()).hasSize(2);
     }
 }

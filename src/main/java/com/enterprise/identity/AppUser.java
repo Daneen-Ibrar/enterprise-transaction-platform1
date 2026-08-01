@@ -12,6 +12,7 @@ import java.util.Set;
 @Table(name = "app_user")
 @FilterDef(name = "tenantFilter", parameters = @ParamDef(name = "tenantId", type = Long.class))
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
+
 public class AppUser {
 
     @Id

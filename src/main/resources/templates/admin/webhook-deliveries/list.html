@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Webhook Deliveries</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .filters { margin-bottom: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .badge { padding: 2px 8px; border-radius: 12px; color: white; }
+        .badge-success { background: #2d7a3a; }
+        .badge-failure { background: #c0392b; }
+        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; background: #3498db; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .btn-retry { background: #f39c12; }
+        .pagination { margin-top: 20px; }
+        .pagination a { margin-right: 8px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
+</head>
+<body>
+    <h1>Webhook Deliveries</h1>
+    <a href="/dashboard">← Back to Admin</a>
+
+    <div class="filters">
+        <form method="get">
+            <label>Config ID: <input type="number" name="configId" th:value="${configId}" /></label>
+            <button type="submit">Filter</button>
+            <a th:href="@{/admin/webhook-deliveries}" style="margin-left:10px;">Reset</a>
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Config</th>
+                <th>Event Type</th>
+                <th>URL</th>
+                <th>Status</th>
+                <th>Attempt</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="delivery : ${deliveries.content}">
+                <td th:text="${delivery.id}">1</td>
+                <td th:text="${delivery.webhookConfigId}">10</td>
+                <td th:text="${delivery.eventType}">TRANSACTION_SETTLED</td>
+                <td th:text="${delivery.url}">https://example.com</td>
+                <td>
+                    <span class="badge" th:classappend="${delivery.success ? 'badge-success' : 'badge-failure'}"
+                          th:text="${delivery.success ? '✅ Success' : '❌ Failed'}">Success</span>
+                </td>
+                <td th:text="${delivery.attemptNumber}">1</td>
+                <td th:text="${delivery.createdAt}">2026-01-01</td>
+                <td>
+                    <!-- Use data-hx-* attributes to avoid Thymeleaf parsing issues -->
+                    <button class="btn btn-retry"
+                            th:data-hx-post="@{/admin/webhook-deliveries/{id}/retry(id=${delivery.id})}"
+                            th:data-hx-target="'#retry-status-' + ${delivery.id}"
+                            data-hx-swap="innerHTML">
+                        Retry
+                    </button>
+                    <span th:id="'retry-status-' + ${delivery.id}"></span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        <span th:if="${deliveries.hasPrevious()}">
+            <a th:href="@{/admin/webhook-deliveries(page=${deliveries.number - 1}, configId=${configId})}">Previous</a>
+        </span>
+        <span>Page [[${deliveries.number + 1}]] of [[${deliveries.totalPages}]]</span>
+        <span th:if="${deliveries.hasNext()}">
+            <a th:href="@{/admin/webhook-deliveries(page=${deliveries.number + 1}, configId=${configId})}">Next</a>
+        </span>
+    </div>
+</body>
+</html>

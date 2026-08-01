@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <title>Settled Transactions – Refund</title>
     <style>
@@ -28,6 +29,7 @@
 
     <!-- ===== BULK REFUND BAR ===== -->
     <form method="post" id="bulkRefundForm" th:action="@{/admin/refunds/bulk}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <div class="bulk-bar">
             <span><strong>Bulk Refund:</strong></span>
             <label>Reason: <input type="text" name="reason" required placeholder="Enter reason for refund..."/></label>
@@ -56,7 +58,7 @@
                     <td th:text="${tx.id}">1</td>
                     <td th:text="${tx.customerId}">1</td>
                     <td th:text="${tx.merchantId}">2</td>
-                    <td th:text="${tx.amount}">100.00</td>
+                    <td th:text="${currencyHelper.getFormattedAmount(tx.amount, tx.currency)}">£ 100.00</td>
                     <td th:text="${tx.updatedAt}">2026-01-01</td>
                     <td>
                         <div th:if="${refundableMap[tx.id]}">

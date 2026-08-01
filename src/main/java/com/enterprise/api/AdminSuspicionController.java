@@ -82,8 +82,8 @@ public class AdminSuspicionController {
             rule.setRiskLevel(riskLevel);
             rule.setDescription(description != null ? description : "Keyword: " + keyword);
             rule.setActive(true);
-            Long tenantId = TenantContext.getTenantId();
-            rule.setTenantId(tenantId != null ? tenantId : 1L);
+            // ✅ FIX: Use required tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             SuspicionRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("SUSPICION", savedRule.getId(), "CREATE", null, savedRule, admin.getId());
 
@@ -139,6 +139,8 @@ public class AdminSuspicionController {
             if (active != null) {
                 rule.setActive(active);
             }
+            // ✅ FIX: Use required tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             SuspicionRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("SUSPICION", savedRule.getId(), "UPDATE", oldRule, savedRule, admin.getId());
 
@@ -193,6 +195,8 @@ public class AdminSuspicionController {
             oldRule.setActive(rule.isActive());
 
             rule.setActive(!rule.isActive());
+            // ✅ FIX: Use required tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             SuspicionRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("SUSPICION", savedRule.getId(), "TOGGLE", oldRule, savedRule, admin.getId());
 

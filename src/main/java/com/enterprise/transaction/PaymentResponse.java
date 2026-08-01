@@ -14,7 +14,6 @@ public class PaymentResponse {
         this.message = message;
     }
 
-    // Getters and setters
     public Long getTransactionId() { return transactionId; }
     public void setTransactionId(Long transactionId) { this.transactionId = transactionId; }
     public String getStatus() { return status; }

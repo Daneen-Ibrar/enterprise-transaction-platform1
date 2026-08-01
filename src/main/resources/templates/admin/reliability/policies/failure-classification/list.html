@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Failure Classification Rules</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1f2937; margin-top: 0; }
+        .header-actions { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { background: #f9fafb; text-align: left; padding: 12px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; }
+        td { padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; vertical-align: middle; }
+        tr:hover { background: #f9fafb; }
+        .badge { padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; display: inline-block; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .actions form { display: inline; margin: 0 2px; }
+        .empty { text-align: center; color: #6b7280; padding: 20px; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { padding: 12px 20px; margin-bottom: 10px; border-radius: 8px; color: white; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 1; transition: opacity 0.3s ease; max-width: 400px; }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        .toast.hide { opacity: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container" class="toast-container">
+        <div th:if="${success}" class="toast toast-success" th:text="${success}"></div>
+        <div th:if="${error}" class="toast toast-error" th:text="${error}"></div>
+    </div>
+
+    <div class="container">
+        <h1>Failure Classification Rules</h1>
+        <div class="header-actions">
+            <a href="/admin/reliability/policies/failure-classification/create" class="btn btn-primary">➕ Create New</a>
+            <a href="/admin/reliability-dashboard" class="btn btn-secondary">← Dashboard</a>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Condition</th>
+                    <th>Category</th>
+                    <th>Severity</th>
+                    <th>Action</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="r : ${rules}">
+                    <td th:text="${r.priority}">10</td>
+                    <td th:text="${r.conditionExpression}">message contains "timeout"</td>
+                    <td th:text="${r.category}">TRANSIENT</td>
+                    <td th:text="${r.severity}">MEDIUM</td>
+                    <td th:text="${r.action}">RETRY</td>
+                    <td><span class="badge" th:class="${r.active} ? 'badge-success' : 'badge-danger'" th:text="${r.active} ? 'Active' : 'Inactive'">Active</span></td>
+                    <td class="actions">
+                        <a th:href="'/admin/reliability/policies/failure-classification/' + ${r.id} + '/edit'" class="btn btn-primary btn-sm">Edit</a>
+                        <form th:action="'/admin/reliability/policies/failure-classification/' + ${r.id} + '/toggle'" method="post">
+                            <button type="submit" class="btn btn-warning btn-sm">Toggle</button>
+                        </form>
+                        <form th:action="'/admin/reliability/policies/failure-classification/' + ${r.id} + '/delete'" method="post" onsubmit="return confirm('Delete this rule?');">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:if="${rules.empty}">
+                    <td colspan="7" class="empty">No failure classification rules found.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toasts = document.querySelectorAll('.toast');
+            toasts.forEach(function(toast, index) {
+                setTimeout(function() {
+                    toast.classList.add('hide');
+                    setTimeout(function() { toast.remove(); }, 300);
+                }, 4000 + (index * 500));
+            });
+        });
+    </script>
+</body>
+</html>

@@ -16,24 +16,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final TransactionService transactionService;
-    private final InvoiceService invoiceService;   // <-- ADDED
+    private final InvoiceService invoiceService;
 
     public PaymentController(TransactionService transactionService,
-                             InvoiceService invoiceService) {   // <-- ADDED
+                             InvoiceService invoiceService) {
         this.transactionService = transactionService;
         this.invoiceService = invoiceService;
     }
 
     @PostMapping("/api/payments")
-    // @PreAuthorize("hasPermission(#request, 'payment:process')")   // Requires 'payment:process' permission
     public ResponseEntity<PaymentResponse> processPayment(
             @Valid @RequestBody PaymentRequest request,
             @RequestHeader(value = "Idempotency-Key", required = true) String idempotencyKey) {
 
         PaymentResponse response = transactionService.processPayment(request, idempotencyKey);
 
-        // If payment was successful, mark the invoice as paid
-        if ("SETTLED".equals(response.getStatus())) {
+        if ("SETTLED".equals(response.getStatus()) && !invoiceService.isInvoicePaid(request.getInvoiceId())) {
             invoiceService.markAsPaid(request.getInvoiceId(), response.getTransactionId());
         }
 

@@ -7,9 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Controller
-@RequestMapping("/api/notifications")
+@RequestMapping("/notifications")
 public class NotificationSSEController {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationSSEController.class);
@@ -33,8 +33,11 @@ public class NotificationSSEController {
     }
 
     @GetMapping("/stream")
+    @Transactional(readOnly = true)  // short transaction for DB query
     public SseEmitter stream(Authentication authentication) {
-        AppUser user = userRepository.findByEmail(authentication.getName())
+        // ✅ Authentication is guaranteed by security filter – no need to check here
+        String email = authentication.getName();
+        AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Long userId = user.getId();
 
@@ -67,7 +70,6 @@ public class NotificationSSEController {
         return emitter;
     }
 
-    // Called from NotificationService to broadcast updates
     public static void broadcast(Long userId, long count) {
         SseEmitter emitter = emitters.get(userId);
         if (emitter != null) {

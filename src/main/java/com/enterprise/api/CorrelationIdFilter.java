@@ -1,5 +1,6 @@
 package com.enterprise.api;
 
+import com.enterprise.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +31,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         try {
             chain.doFilter(request, response);
         } finally {
+            // Clear tenant context after request completes
+            TenantContext.clear();
             MDC.clear();
         }
     }

@@ -5,7 +5,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class RateLimitService {
@@ -28,45 +27,54 @@ public class RateLimitService {
         this.redisTemplate = redisTemplate;
     }
 
+    public enum RateLimitType {
+        PAYMENT,
+        READ
+    }
+
+    // Original method (for API key)
     public boolean isAllowed(String key, RateLimitType type) {
-        String redisKey = "rate:" + type.name().toLowerCase() + ":" + key;
-        int limit = type == RateLimitType.PAYMENT ? paymentRequestLimit : readRequestLimit;
-        int window = type == RateLimitType.PAYMENT ? paymentRequestWindowSeconds : readRequestWindowSeconds;
+        return isAllowed("rate:" + type.name().toLowerCase() + ":" + key, getLimit(type), getWindow(type));
+    }
 
+    // New method: tenant-aware
+    public boolean isAllowedForTenant(Long tenantId, String apiKey, RateLimitType type) {
+        String key = "rate:tenant:" + tenantId + ":" + type.name().toLowerCase() + ":" + apiKey;
+        return isAllowed(key, getLimit(type), getWindow(type));
+    }
+
+    private boolean isAllowed(String redisKey, int limit, int windowSeconds) {
         Long count = redisTemplate.opsForValue().increment(redisKey);
-
         if (count == null) {
-            // Redis unavailable – fallback to allow (or reject based on your choice)
-            // We'll allow but log a warning
-            return true;
+            return true; // fallback: allow if Redis fails
         }
-
-        // Set expiry on first request
         if (count == 1) {
-            redisTemplate.expire(redisKey, Duration.ofSeconds(window));
+            redisTemplate.expire(redisKey, Duration.ofSeconds(windowSeconds));
         }
-
         return count <= limit;
     }
 
-    public void resetLimit(String key, RateLimitType type) {
-        String redisKey = "rate:" + type.name().toLowerCase() + ":" + key;
-        redisTemplate.delete(redisKey);
+    private int getLimit(RateLimitType type) {
+        return type == RateLimitType.PAYMENT ? paymentRequestLimit : readRequestLimit;
+    }
+
+    private int getWindow(RateLimitType type) {
+        return type == RateLimitType.PAYMENT ? paymentRequestWindowSeconds : readRequestWindowSeconds;
     }
 
     public long getRemainingQuota(String key, RateLimitType type) {
         String redisKey = "rate:" + type.name().toLowerCase() + ":" + key;
         String count = redisTemplate.opsForValue().get(redisKey);
-        if (count == null) {
-            return type == RateLimitType.PAYMENT ? paymentRequestLimit : readRequestLimit;
-        }
+        if (count == null) return getLimit(type);
         long current = Long.parseLong(count);
-        long limit = type == RateLimitType.PAYMENT ? paymentRequestLimit : readRequestLimit;
-        return Math.max(0, limit - current);
+        return Math.max(0, getLimit(type) - current);
     }
 
-    public enum RateLimitType {
-        PAYMENT,
-        READ
+    public long getRemainingQuotaForTenant(Long tenantId, String apiKey, RateLimitType type) {
+        String redisKey = "rate:tenant:" + tenantId + ":" + type.name().toLowerCase() + ":" + apiKey;
+        String count = redisTemplate.opsForValue().get(redisKey);
+        if (count == null) return getLimit(type);
+        long current = Long.parseLong(count);
+        return Math.max(0, getLimit(type) - current);
     }
 }

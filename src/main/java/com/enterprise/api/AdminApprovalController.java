@@ -98,7 +98,8 @@ public class AdminApprovalController {
             autoRule.setRequiresApproval(false);
             autoRule.setDescription("Amount £" + threshold + " or less – auto-approved");
             autoRule.setActive(true);
-            autoRule.setTenantId(TenantContext.getTenantId() != null ? TenantContext.getTenantId() : 1L);
+            // ✅ FIX: Set tenant ID – fail closed
+            autoRule.setTenantId(TenantContext.getRequiredTenantId());
             autoRule = ruleRepository.save(autoRule);
             ruleAuditService.logChange("APPROVAL", autoRule.getId(), "CREATE", null, autoRule, admin.getId());
 
@@ -108,7 +109,7 @@ public class AdminApprovalController {
             requireRule.setRequiresApproval(true);
             requireRule.setDescription("Amount over £" + threshold + " – requires approval");
             requireRule.setActive(true);
-            requireRule.setTenantId(TenantContext.getTenantId() != null ? TenantContext.getTenantId() : 1L);
+            requireRule.setTenantId(TenantContext.getRequiredTenantId());
             requireRule = ruleRepository.save(requireRule);
             ruleAuditService.logChange("APPROVAL", requireRule.getId(), "CREATE", null, requireRule, admin.getId());
 
@@ -135,8 +136,8 @@ public class AdminApprovalController {
             AppUser admin = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
 
-            Long tenantId = TenantContext.getTenantId();
-            rule.setTenantId(tenantId != null ? tenantId : 1L);
+            // ✅ FIX: Set tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             rule.setActive(true);
             ApprovalRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("APPROVAL", savedRule.getId(), "CREATE", null, savedRule, admin.getId());
@@ -172,6 +173,8 @@ public class AdminApprovalController {
 
             rule.setId(id);
             rule.setCreatedAt(oldRule.getCreatedAt());
+            // ✅ FIX: Set tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             ApprovalRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("APPROVAL", savedRule.getId(), "UPDATE", oldRule, savedRule, admin.getId());
 
@@ -226,6 +229,8 @@ public class AdminApprovalController {
             oldRule.setActive(rule.isActive());
 
             rule.setActive(!rule.isActive());
+            // ✅ FIX: Set tenant ID – fail closed
+            rule.setTenantId(TenantContext.getRequiredTenantId());
             ApprovalRule savedRule = ruleRepository.save(rule);
             ruleAuditService.logChange("APPROVAL", savedRule.getId(), "TOGGLE", oldRule, savedRule, admin.getId());
 
