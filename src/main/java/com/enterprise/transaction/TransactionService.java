@@ -132,8 +132,9 @@ public class TransactionService {
             }
         }
 
+        // ===== FIXED: Use findFirstByIdempotencyKeyOrderByIdDesc =====
         // 2. Check DB for existing idempotency key
-        Optional<Transaction> existing = transactionRepository.findByIdempotencyKey(idempotencyKey);
+        Optional<Transaction> existing = transactionRepository.findFirstByIdempotencyKeyOrderByIdDesc(idempotencyKey);
         if (existing.isPresent()) {
             Optional<IdempotencyKey> idemKeyOpt = idempotencyKeyRepository.findById(idempotencyKey);
             if (idemKeyOpt.isPresent()) {
@@ -198,7 +199,8 @@ public class TransactionService {
             savedTransaction = transactionRepository.save(transaction);
         } catch (DataIntegrityViolationException e) {
             log.warn("Duplicate idempotency key detected (race condition), retrieving existing transaction: {}", idempotencyKey);
-            Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(idempotencyKey);
+            // ===== FIXED: Use findFirstByIdempotencyKeyOrderByIdDesc here too =====
+            Optional<Transaction> existingTx = transactionRepository.findFirstByIdempotencyKeyOrderByIdDesc(idempotencyKey);
             if (existingTx.isPresent()) {
                 Transaction tx = existingTx.get();
                 PaymentResponse response = new PaymentResponse(tx.getId(), tx.getStatus().name(), "Duplicate request – original response returned");

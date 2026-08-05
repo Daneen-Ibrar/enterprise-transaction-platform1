@@ -2,12 +2,16 @@ package com.enterprise.invoice;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 
-public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
+public interface InvoiceRepository extends JpaRepository<Invoice, Long>, JpaSpecificationExecutor<Invoice> {
     List<Invoice> findByMerchantId(Long merchantId);
     List<Invoice> findByCustomerEmail(String customerEmail);
     List<Invoice> findByStatusAndRequiresApproval(String status, boolean requiresApproval);
@@ -22,5 +26,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByMerchantIdAndStatus(Long merchantId, String status);
 
-    // ===== REMOVED: findDistinctCustomerEmailsByMerchantId – caused SQL DISTINCT ordering error =====
+    // ===== OPTIMISTIC LOCKING WITH RETRY - find with lock =====
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Invoice i WHERE i.id = :id")
+    Optional<Invoice> findByIdWithLock(@Param("id") Long id);
 }

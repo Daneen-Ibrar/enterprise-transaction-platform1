@@ -23,11 +23,12 @@
 
     <div th:if="${error}" class="error" th:text="${error}">Error message</div>
 
-    <div th:if="${diffs.empty and !error}">
+    <!-- ===== FIXED: Check if diffs is null before accessing .empty ===== -->
+    <div th:if="${diffs != null and diffs.empty and !error}">
         <p>No changes detected (or snapshots unavailable).</p>
     </div>
 
-    <table class="diff-table" th:unless="${diffs.empty}">
+    <table class="diff-table" th:unless="${diffs == null or diffs.empty}">
         <thead>
             <tr>
                 <th>Field</th>

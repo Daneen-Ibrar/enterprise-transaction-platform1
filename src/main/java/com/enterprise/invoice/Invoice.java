@@ -30,7 +30,7 @@ public class Invoice {
     private Long merchantId;
 
     @Column(nullable = false)
-    private String status; // DRAFT, PENDING_APPROVAL, APPROVED, PAID, REJECTED
+    private String status;
 
     @Column(name = "requires_approval")
     private boolean requiresApproval = false;
@@ -50,7 +50,7 @@ public class Invoice {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    // ===== NEW FIELDS =====
+    // ===== WOOCOMMERCE FIELDS =====
     @Column(name = "woo_order_id")
     private Long wooOrderId;
 
@@ -60,6 +60,10 @@ public class Invoice {
     @Column(name = "return_url", columnDefinition = "TEXT")
     private String returnUrl;
 
+    @Column(name = "order_key")
+    private String orderKey;
+
+    // ===== OPTIMISTIC LOCKING =====
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
@@ -75,7 +79,7 @@ public class Invoice {
         this.status = "DRAFT";
     }
 
-    // Getters and setters (including new ones)
+    // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -118,7 +122,7 @@ public class Invoice {
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
 
-    // NEW GETTERS/SETTERS
+    // WooCommerce getters/setters
     public Long getWooOrderId() { return wooOrderId; }
     public void setWooOrderId(Long wooOrderId) { this.wooOrderId = wooOrderId; }
 
@@ -127,4 +131,7 @@ public class Invoice {
 
     public String getReturnUrl() { return returnUrl; }
     public void setReturnUrl(String returnUrl) { this.returnUrl = returnUrl; }
+
+    public String getOrderKey() { return orderKey; }
+    public void setOrderKey(String orderKey) { this.orderKey = orderKey; }
 }

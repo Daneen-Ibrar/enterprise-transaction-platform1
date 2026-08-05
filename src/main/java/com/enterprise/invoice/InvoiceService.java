@@ -10,8 +10,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +41,7 @@ public class InvoiceService {
     private final ApprovalService approvalService;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
 
     public InvoiceService(InvoiceRepository invoiceRepository,
                           NotificationService notificationService,
@@ -40,7 +49,8 @@ public class InvoiceService {
                           SuspicionService suspicionService,
                           ApprovalService approvalService,
                           AuditService auditService,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          RestTemplate restTemplate) {
         this.invoiceRepository = invoiceRepository;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
@@ -48,13 +58,15 @@ public class InvoiceService {
         this.approvalService = approvalService;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.restTemplate = restTemplate;
     }
 
-    // ===== UPDATED CREATE INVOICE – with WooCommerce fields =====
+    // ===== PRIMARY CREATE INVOICE =====
     @Transactional
     public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
                                  Long merchantId, boolean requiresApproval, String currency,
-                                 Long wooOrderId, String webhookUrl, String returnUrl) {
+                                 Long wooOrderId, String webhookUrl, String returnUrl,
+                                 String orderKey) {
         log.info("📝 Creating invoice for merchant {}: amount {}, description '{}', customer {}, currency {}",
                 merchantId, amount, description, customerEmail, currency);
 
@@ -73,10 +85,10 @@ public class InvoiceService {
         invoice.setCurrency(currency != null && !currency.isEmpty() ? currency : "GBP");
         invoice.setTenantId(tenantId);
 
-        // Store WooCommerce fields (may be null)
         invoice.setWooOrderId(wooOrderId);
         invoice.setWebhookUrl(webhookUrl);
         invoice.setReturnUrl(returnUrl);
+        invoice.setOrderKey(orderKey);
 
         SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
         invoice.setRiskLevel(result.getRiskLevel());
@@ -91,7 +103,6 @@ public class InvoiceService {
 
         invoice = invoiceRepository.save(invoice);
 
-        // Audit
         Map<String, Object> afterMap = objectMapper.convertValue(invoice, Map.class);
         Map<String, Object> beforeMap = new HashMap<>();
         for (String key : afterMap.keySet()) {
@@ -151,26 +162,50 @@ public class InvoiceService {
         return invoice;
     }
 
-    // ===== OVERLOADED VERSION – for backward compatibility (calls the new one with nulls) =====
+    // ===== OVERLOADS =====
     @Transactional
     public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
                                  Long merchantId, boolean requiresApproval, String currency) {
         return createInvoice(amount, description, customerEmail, merchantId,
-                requiresApproval, currency, null, null, null);
+                requiresApproval, currency, null, null, null, null);
     }
+
+    @Transactional
+    public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
+                                 Long merchantId, boolean requiresApproval, String currency,
+                                 Long wooOrderId, String webhookUrl, String returnUrl) {
+        return createInvoice(amount, description, customerEmail, merchantId,
+                requiresApproval, currency, wooOrderId, webhookUrl, returnUrl, null);
+    }
+
+    // ===== ASYNC WEBHOOK METHODS =====
+    @Async
+    public void sendApprovalWebhookAsync(Invoice invoice) {
+        sendApprovalWebhook(invoice);
+    }
+
+    @Async
+    public void sendRejectionWebhookAsync(Invoice invoice, String reason) {
+        sendRejectionWebhook(invoice, reason);
+    }
+
+    // ===== APPROVE INVOICE =====
+    @Retryable(
+        value = {OptimisticLockingFailureException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 100)
+    )
     @Transactional
     public Invoice approveInvoice(Long invoiceId, Long adminId) {
         log.info("🔵 InvoiceService.approveInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
 
-        Invoice beforeEntity = invoiceRepository.findById(invoiceId)
+        Invoice invoice = invoiceRepository.findByIdWithLock(invoiceId)
                 .orElseThrow(() -> {
                     log.error("❌ Invoice not found: {}", invoiceId);
                     return new RuntimeException("Invoice not found");
                 });
-        Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
 
-        Invoice invoice = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        Map<String, Object> before = objectMapper.convertValue(invoice, Map.class);
 
         if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
             log.warn("⚠️ Invoice {} is not pending approval (status: {})", invoiceId, invoice.getStatus());
@@ -211,20 +246,30 @@ public class InvoiceService {
             );
         }
 
+        // ===== SEND WEBHOOK ASYNCHRONOUSLY =====
+        sendApprovalWebhookAsync(afterEntity);
+
         log.info("✅ Invoice {} approved successfully", invoiceId);
         return afterEntity;
     }
 
+    // ===== REJECT INVOICE =====
+    @Retryable(
+        value = {OptimisticLockingFailureException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 100)
+    )
     @Transactional
-    public Invoice rejectInvoice(Long invoiceId, Long adminId) {
-        log.info("🔴 InvoiceService.rejectInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
+    public Invoice rejectInvoice(Long invoiceId, Long adminId, String reason) {
+        log.info("🔴 InvoiceService.rejectInvoice() called - invoice: {}, admin: {}, reason: {}", invoiceId, adminId, reason);
 
-        Invoice beforeEntity = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
-        Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
+        Invoice invoice = invoiceRepository.findByIdWithLock(invoiceId)
+                .orElseThrow(() -> {
+                    log.error("❌ Invoice not found: {}", invoiceId);
+                    return new RuntimeException("Invoice not found");
+                });
 
-        Invoice invoice = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        Map<String, Object> before = objectMapper.convertValue(invoice, Map.class);
 
         if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
             log.warn("⚠️ Invoice {} is not pending approval (status: {})", invoiceId, invoice.getStatus());
@@ -240,7 +285,7 @@ public class InvoiceService {
         auditService.recordEvent(
                 "INVOICE_REJECTED",
                 adminId,
-                Map.of("invoiceId", invoiceId),
+                Map.of("invoiceId", invoiceId, "reason", reason),
                 "Invoice",
                 invoiceId,
                 before,
@@ -251,7 +296,7 @@ public class InvoiceService {
                 invoice.getMerchantId(),
                 "INVOICE_REJECTED",
                 "Invoice Rejected",
-                String.format("Invoice #%d was rejected by Admin", invoiceId),
+                String.format("Invoice #%d was rejected by Admin. Reason: %s", invoiceId, reason != null ? reason : "No reason provided"),
                 "/invoices/" + invoiceId
         );
         Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
@@ -260,15 +305,80 @@ public class InvoiceService {
                     customerId,
                     "INVOICE_REJECTED",
                     "Invoice Rejected",
-                    String.format("Invoice #%d was rejected", invoiceId),
+                    String.format("Invoice #%d was rejected. Reason: %s", invoiceId, reason != null ? reason : "No reason provided"),
                     "/invoices/" + invoiceId
             );
         }
+
+        // ===== SEND WEBHOOK ASYNCHRONOUSLY =====
+        sendRejectionWebhookAsync(afterEntity, reason);
 
         log.info("✅ Invoice {} rejected successfully", invoiceId);
         return afterEntity;
     }
 
+    // ===== OVERLOAD for backward compatibility =====
+    @Transactional
+    public Invoice rejectInvoice(Long invoiceId, Long adminId) {
+        return rejectInvoice(invoiceId, adminId, null);
+    }
+
+    // ===== WEBHOOK SENDING METHODS =====
+    private void sendApprovalWebhook(Invoice invoice) {
+        if (invoice.getWebhookUrl() == null || invoice.getWebhookUrl().isEmpty()) {
+            log.debug("No webhook URL for invoice {}", invoice.getId());
+            return;
+        }
+
+        String paymentUrl = null;
+        if (invoice.getReturnUrl() != null && invoice.getWooOrderId() != null) {
+            String orderKey = invoice.getOrderKey() != null ? invoice.getOrderKey() : "wc_order_" + invoice.getWooOrderId();
+            paymentUrl = invoice.getReturnUrl() + "/" + invoice.getWooOrderId() + "/?key=" + orderKey;
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", "INVOICE_APPROVED");
+        payload.put("orderId", invoice.getWooOrderId());
+        payload.put("invoiceId", invoice.getId());
+        payload.put("paymentUrl", paymentUrl);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+
+        try {
+            restTemplate.postForEntity(invoice.getWebhookUrl(), entity, String.class);
+            log.info("✅ Approval webhook sent for invoice {}", invoice.getId());
+        } catch (Exception e) {
+            log.error("❌ Failed to send approval webhook for invoice {}: {}", invoice.getId(), e.getMessage());
+        }
+    }
+
+    private void sendRejectionWebhook(Invoice invoice, String reason) {
+        if (invoice.getWebhookUrl() == null || invoice.getWebhookUrl().isEmpty()) {
+            log.debug("No webhook URL for invoice {}", invoice.getId());
+            return;
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", "INVOICE_REJECTED");
+        payload.put("orderId", invoice.getWooOrderId());
+        payload.put("invoiceId", invoice.getId());
+        payload.put("reason", reason != null ? reason : "Order rejected by merchant");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+
+        try {
+            restTemplate.postForEntity(invoice.getWebhookUrl(), entity, String.class);
+            log.info("✅ Rejection webhook sent for invoice {}", invoice.getId());
+        } catch (Exception e) {
+            log.error("❌ Failed to send rejection webhook for invoice {}: {}", invoice.getId(), e.getMessage());
+        }
+    }
+
+    // ===== BULK OPERATIONS =====
     public int bulkApproveInvoices(List<Long> invoiceIds, Long adminId) {
         log.info("🟢 bulkApproveInvoices() called with {} invoices by admin {}", invoiceIds.size(), adminId);
         int approvedCount = 0;
@@ -301,6 +411,7 @@ public class InvoiceService {
         return rejectedCount;
     }
 
+    // ===== MARK AS PAID =====
     @Transactional
     public void markAsPaid(Long invoiceId, Long transactionId) {
         log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
@@ -354,6 +465,7 @@ public class InvoiceService {
                 .orElse(false);
     }
 
+    // ===== RE-EVALUATION =====
     @Transactional
     public void reEvaluateAllInvoices() {
         log.info("🔄 Re-evaluating all non-paid invoices for approval rules");
@@ -437,6 +549,7 @@ public class InvoiceService {
         reEvaluateAllInvoicesForSuspicion();
     }
 
+    // ===== UPDATE =====
     @Transactional
     public void updateInvoice(Invoice invoice) {
         Invoice existing = invoiceRepository.findById(invoice.getId())
@@ -447,12 +560,14 @@ public class InvoiceService {
         invoiceRepository.save(existing);
     }
 
+    // ===== HELPERS =====
     private Long getUserIdByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(AppUser::getId)
                 .orElse(null);
     }
 
+    // ===== FINDERS =====
     public Optional<Invoice> findById(Long id) {
         return invoiceRepository.findById(id);
     }

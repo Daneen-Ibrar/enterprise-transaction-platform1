@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -50,7 +51,7 @@ public class WooCommerceController {
     }
 
     @PostMapping("/create-invoice")
-    public ResponseEntity<Map<String, Long>> createInvoice(@RequestBody WooCommerceOrder order) {
+    public ResponseEntity<Map<String, Object>> createInvoice(@RequestBody WooCommerceOrder order) {
         Long tenantId = order.getTenantId() != null ? order.getTenantId() : 1L;
         TenantContext.setTenantId(tenantId);
         log.info("🔵 Tenant set to: {}", tenantId);
@@ -61,13 +62,18 @@ public class WooCommerceController {
                     "WooCommerce Order #" + order.getOrderId(),
                     order.getBillingEmail(),
                     order.getMerchantId(),
-                    false, // let approval rules decide
+                    false,
                     order.getCurrency(),
-                    order.getOrderId(),           // wooOrderId
-                    order.getWebhookUrl(),         // webhookUrl
-                    order.getReturnUrl()           // returnUrl
+                    order.getOrderId(),
+                    order.getWebhookUrl(),
+                    order.getReturnUrl(),
+                    order.getOrderKey()
             );
-            return ResponseEntity.ok(Map.of("invoiceId", invoice.getId()));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("invoiceId", invoice.getId());
+            response.put("status", invoice.getStatus());
+            return ResponseEntity.ok(response);
         } finally {
             TenantContext.clear();
         }
@@ -102,7 +108,7 @@ public class WooCommerceController {
                     order.getMerchantId(),
                     false,
                     order.getCurrency(),
-                    null, null, null  // no redirect/webhook for direct API call
+                    null, null, null, null
             );
 
             PaymentRequest request = new PaymentRequest();
@@ -148,7 +154,6 @@ public class WooCommerceController {
         private String webhookUrl;
         private String returnUrl;
 
-        // Getters and setters
         public Long getOrderId() { return orderId; }
         public void setOrderId(Long orderId) { this.orderId = orderId; }
         public String getOrderKey() { return orderKey; }
@@ -183,7 +188,6 @@ public class WooCommerceController {
             this.transactionId = transactionId;
             this.message = message;
         }
-
         public Long getOrderId() { return orderId; }
         public String getStatus() { return status; }
         public Long getTransactionId() { return transactionId; }

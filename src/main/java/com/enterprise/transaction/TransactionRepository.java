@@ -2,11 +2,21 @@ package com.enterprise.transaction;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.util.List;
 import java.util.Optional;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long>, JpaSpecificationExecutor<Transaction> {
-    Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
+    
+    // ===== USE SPRING DATA's findFirst (preferred) =====
+    Optional<Transaction> findFirstByIdempotencyKeyOrderByIdDesc(String idempotencyKey);
+    
+    // ===== FALLBACK: Return Optional with LIMIT 1 =====
+    @Query(value = "SELECT * FROM transaction WHERE idempotency_key = :key ORDER BY id DESC LIMIT 1", nativeQuery = true)
+    Optional<Transaction> findByIdempotencyKey(@Param("key") String key);
+    
     List<Transaction> findByStatus(TransactionStatus status);
 
     // ===== USER-SPECIFIC METHODS =====

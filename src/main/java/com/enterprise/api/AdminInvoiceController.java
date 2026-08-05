@@ -22,7 +22,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Controller
@@ -64,7 +63,6 @@ public class AdminInvoiceController {
             List<Invoice> allPending = invoiceService.getPendingApprovalInvoices();
             log.info("Found {} pending invoices", allPending.size());
 
-            // Filter to only GREEN risk level (non-suspicious)
             List<Invoice> pending = allPending.stream()
                     .filter(inv -> {
                         String risk = inv.getRiskLevel();
@@ -83,7 +81,7 @@ public class AdminInvoiceController {
         }
     }
 
-    // ===== SINGLE APPROVE (with detailed logging) =====
+    // ===== SINGLE APPROVE =====
     @PostMapping("/{id}/approve")
     public String approveInvoice(@PathVariable Long id, 
                                  Authentication authentication,
@@ -96,7 +94,6 @@ public class AdminInvoiceController {
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
             log.info("🔵 Admin found: {} (ID: {})", admin.getEmail(), admin.getId());
 
-            // Check if invoice exists
             var invoiceOpt = invoiceService.findById(id);
             if (invoiceOpt.isEmpty()) {
                 log.error("🔵 Invoice {} not found", id);
@@ -127,37 +124,26 @@ public class AdminInvoiceController {
         }
     }
 
-    // ===== SINGLE REJECT =====
+    // ===== SINGLE REJECT (with default reason) =====
     @PostMapping("/{id}/reject")
     public String rejectInvoice(@PathVariable Long id, 
+                                @RequestParam(required = false) String reason,
                                 Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
         log.info("🔴 ===== SINGLE REJECT REQUEST for invoice ID: {} =====", id);
-        log.info("🔴 User: {}", authentication.getName());
+        log.info("🔴 User: {}, Reason: {}", authentication.getName(), reason);
         
         try {
             AppUser admin = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
             log.info("🔴 Admin found: {} (ID: {})", admin.getEmail(), admin.getId());
 
-            var invoiceOpt = invoiceService.findById(id);
-            if (invoiceOpt.isEmpty()) {
-                log.error("🔴 Invoice {} not found", id);
-                redirectAttributes.addFlashAttribute("error", "Invoice not found");
-                return "redirect:/admin/invoices/pending";
-            }
-            
-            Invoice invoice = invoiceOpt.get();
-            log.info("🔴 Invoice found: ID={}, status={}", invoice.getId(), invoice.getStatus());
-            
-            if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
-                log.warn("🔴 Invoice {} is not pending approval (status: {})", id, invoice.getStatus());
-                redirectAttributes.addFlashAttribute("error", "Invoice is not pending approval");
-                return "redirect:/admin/invoices/pending";
+            // If no reason provided, use a default
+            if (reason == null || reason.trim().isEmpty()) {
+                reason = "Rejected by admin";
             }
 
-            log.info("🔴 Calling invoiceService.rejectInvoice({}, {})", id, admin.getId());
-            Invoice rejectedInvoice = invoiceService.rejectInvoice(id, admin.getId());
+            Invoice rejectedInvoice = invoiceService.rejectInvoice(id, admin.getId(), reason);
             log.info("✅ Invoice {} rejected successfully. New status: {}", id, rejectedInvoice.getStatus());
             
             redirectAttributes.addFlashAttribute("success", "Invoice #" + id + " rejected.");
@@ -191,6 +177,7 @@ public class AdminInvoiceController {
     // ===== BULK REJECT =====
     @PostMapping("/bulk/reject")
     public String bulkReject(@RequestParam List<Long> ids,
+                             @RequestParam(required = false) String reason,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         log.info("📦 BULK REJECT for {} invoices", ids.size());

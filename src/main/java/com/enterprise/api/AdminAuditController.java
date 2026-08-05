@@ -85,7 +85,6 @@ public class AdminAuditController {
         return "admin/audit/list";
     }
 
-    // ===== JSON endpoint (keep for API) =====
     @GetMapping("/verify")
     @ResponseBody
     public Map<String, Object> verifyChainJson() {
@@ -97,34 +96,37 @@ public class AdminAuditController {
         );
     }
 
-    // ===== HTMX fragment endpoint =====
     @GetMapping("/verify-fragment")
     public String verifyChainFragment(Model model) {
         boolean valid = auditService.verifyChain();
         model.addAttribute("valid", valid);
         model.addAttribute("status", valid ? "INTEGRITY_VALID" : "INTEGRITY_BROKEN");
         model.addAttribute("timestamp", java.time.Instant.now().toString());
-        return "admin/audit/verify-fragment";  // Thymeleaf fragment
+        return "admin/audit/verify-fragment";
     }
 
-    // ===== DIFF VIEW =====
+    // ===== FIXED: DIFF VIEW =====
     @GetMapping("/diff/{eventId}")
     public String showDiff(@PathVariable Long eventId, Model model) {
         AuditEvent event = auditService.getEventById(eventId)
                 .orElseThrow(() -> new RuntimeException("Audit event not found"));
 
         List<AuditDiffService.DiffEntry> diffs = new ArrayList<>();
+        String errorMessage = null;
+
         if (event.getPreviousState() != null && event.getCurrentState() != null) {
             try {
                 diffs = auditDiffService.diff(event.getPreviousState(), event.getCurrentState());
             } catch (Exception e) {
                 log.error("Failed to compute diff for event {}", eventId, e);
-                model.addAttribute("error", "Could not compute diff: " + e.getMessage());
+                errorMessage = "Could not compute diff: " + e.getMessage();
             }
         }
 
         model.addAttribute("event", event);
-        model.addAttribute("diffs", diffs);
+        model.addAttribute("diffs", diffs != null ? diffs : new ArrayList<>());
+        model.addAttribute("error", errorMessage);  // This matches the template
+
         return "admin/audit/diff";
     }
 }

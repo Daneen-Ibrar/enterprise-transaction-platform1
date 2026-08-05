@@ -4,15 +4,21 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 
 public interface AuditRepository extends JpaRepository<AuditEvent, Long>, JpaSpecificationExecutor<AuditEvent> {
+
+    // ===== Basic queries =====
     List<AuditEvent> findByUserIdOrderByCreatedAtAsc(Long userId);
+
     Optional<AuditEvent> findFirstByOrderByCreatedAtDesc();
+
     Optional<AuditEvent> findFirstByTenantIdOrderByCreatedAtDesc(Long tenantId);
 
     @Query("SELECT DISTINCT a.eventType FROM AuditEvent a WHERE a.tenantId = :tenantId ORDER BY a.eventType")
@@ -23,4 +29,17 @@ public interface AuditRepository extends JpaRepository<AuditEvent, Long>, JpaSpe
 
     // ===== Paginated by tenant for verification =====
     Page<AuditEvent> findByTenantIdOrderByCreatedAtAsc(Long tenantId, Pageable pageable);
+
+    // ================================================================
+    // FIXED: Use Spring Data's findFirst with lock (returns only ONE result)
+    // ================================================================
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<AuditEvent> findFirstByEntityTypeAndEntityIdOrderByIdDesc(String entityType, Long entityId);
+
+    // ================================================================
+    // OR use native query with LIMIT 1
+    // ================================================================
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(value = "SELECT * FROM audit_event WHERE entity_type = :entityType AND entity_id = :entityId ORDER BY id DESC LIMIT 1", nativeQuery = true)
+    Optional<AuditEvent> findLastEventWithLock(@Param("entityType") String entityType, @Param("entityId") Long entityId);
 }

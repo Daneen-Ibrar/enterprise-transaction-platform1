@@ -70,10 +70,9 @@ public class PublicPaymentController {
     @PostMapping("/{invoiceId}")
     public String processPayment(@PathVariable Long invoiceId,
                                  @RequestParam String idempotencyKey,
-                                 @RequestParam(required = false) String wooOrderId, // kept for compatibility
+                                 @RequestParam(required = false) String wooOrderId,
                                  Model model) {
         try {
-            // 1. Load invoice and set tenant
             Invoice invoice = invoiceService.findById(invoiceId)
                     .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
@@ -86,7 +85,6 @@ public class PublicPaymentController {
                 return "payment/error";
             }
 
-            // 2. Create or fetch customer
             AppUser customer = userRepository.findByEmail(invoice.getCustomerEmail())
                     .orElseGet(() -> {
                         AppUser newUser = new AppUser();
@@ -105,7 +103,6 @@ public class PublicPaymentController {
                 return "payment/error";
             }
 
-            // 3. Process payment
             PaymentRequest request = new PaymentRequest();
             request.setInvoiceId(invoiceId);
             request.setCustomerId(customer.getId());
@@ -118,7 +115,6 @@ public class PublicPaymentController {
             if ("SETTLED".equals(response.getStatus())) {
                 invoiceService.markAsPaid(invoiceId, response.getTransactionId());
 
-                // 4. If this is a WooCommerce order (has webhookUrl), send webhook and redirect
                 if (invoice.getWebhookUrl() != null && !invoice.getWebhookUrl().isEmpty()) {
                     log.info("📤 Sending webhook to {}", invoice.getWebhookUrl());
 
@@ -140,14 +136,22 @@ public class PublicPaymentController {
                         log.error("❌ Webhook failed: {}", e.getMessage());
                     }
 
-                    // Redirect to the return URL (if provided)
-                    if (invoice.getReturnUrl() != null && !invoice.getReturnUrl().isEmpty()) {
-                        String redirect = invoice.getReturnUrl() + "/" + invoice.getWooOrderId() + "/?key=wc_order_" + invoice.getWooOrderId();
+                    // ===== REDIRECT – use stored orderKey =====
+                    String orderIdForRedirect = wooOrderId != null ? wooOrderId :
+                            (invoice.getWooOrderId() != null ? String.valueOf(invoice.getWooOrderId()) : null);
+
+                    if (invoice.getReturnUrl() != null && !invoice.getReturnUrl().isEmpty() && orderIdForRedirect != null) {
+                        String orderKey = invoice.getOrderKey() != null ? invoice.getOrderKey() : "wc_order_" + orderIdForRedirect;
+                        String redirect = invoice.getReturnUrl() + "/" + orderIdForRedirect + "/?key=" + orderKey;
+                        log.info("🔀 Redirecting to: " + redirect);
                         return "redirect:" + redirect;
+                    } else {
+                        log.warn("⚠️ Cannot redirect: returnUrl or orderId is missing");
+                        model.addAttribute("response", response);
+                        return "payment/result";
                     }
                 }
 
-                // 5. Manual invoice flow – show result page
                 model.addAttribute("response", response);
                 return "payment/result";
             }
