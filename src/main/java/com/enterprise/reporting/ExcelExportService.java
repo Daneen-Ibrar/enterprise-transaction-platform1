@@ -22,7 +22,7 @@ public class ExcelExportService {
         this.reportingService = reportingService;
     }
 
-    public ByteArrayOutputStream generateReport(LocalDate startDate, LocalDate endDate) {
+    public ByteArrayOutputStream generateReport(LocalDate startDate, LocalDate endDate, Long tenantId) {  // 👈 add param
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Workbook workbook = new XSSFWorkbook()) {
             // Sheet 1: Summary
@@ -32,7 +32,7 @@ public class ExcelExportService {
             row.createCell(0).setCellValue("Metric");
             row.createCell(1).setCellValue("Value");
 
-            Map<String, Object> summary = reportingService.getSummaryMetrics(startDate, endDate);
+            Map<String, Object> summary = reportingService.getSummaryMetrics(startDate, endDate, tenantId);  // 👈 pass tenantId
             Object[][] data = {
                     {"Date Range", startDate + " to " + endDate},
                     {"Total Transactions", summary.get("totalTransactions")},
@@ -59,7 +59,7 @@ public class ExcelExportService {
                 header.createCell(i).setCellValue(columns[i]);
             }
 
-            List<Transaction> transactions = reportingService.getTransactionsBetween(startDate, endDate);
+            List<Transaction> transactions = reportingService.getTransactionsBetween(startDate, endDate, tenantId);  // 👈 pass tenantId
             int txRow = 1;
             for (Transaction tx : transactions) {
                 Row r = txSheet.createRow(txRow++);

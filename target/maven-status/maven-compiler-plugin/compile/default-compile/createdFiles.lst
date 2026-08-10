@@ -83,6 +83,7 @@ com/enterprise/web/TenantInterceptor.class
 com/enterprise/config/MetricsConfig.class
 com/enterprise/api/v1/ErrorResponse.class
 com/enterprise/reporting/ReportingService.class
+com/enterprise/api/PaymentPageController.class
 com/enterprise/invoice/RecurringSchedule$Frequency.class
 com/enterprise/webhook/WebhookRepository.class
 com/enterprise/api/ReportHistoryController.class
@@ -178,7 +179,6 @@ com/enterprise/invoice/InvoiceMessageService.class
 com/enterprise/config/AppConfig.class
 com/enterprise/api/CurrencyControllerAdvice.class
 com/enterprise/reporting/GeneratedReport.class
-com/enterprise/api/PublicPaymentController.class
 com/enterprise/money/Money.class
 com/enterprise/transaction/Transaction.class
 com/enterprise/api/NotificationController.class
@@ -205,7 +205,6 @@ com/enterprise/tenant/TenantRepository.class
 com/enterprise/api/ExportController.class
 com/enterprise/api/v1/PaymentErrorCodes.class
 com/enterprise/security/LogoutSuccessHandler.class
-com/enterprise/api/PublicApiController.class
 com/enterprise/security/RateLimitService.class
 com/enterprise/transaction/PaymentResponse.class
 com/enterprise/reporting/GeneratedReportRepository.class
@@ -223,6 +222,7 @@ com/enterprise/ledger/LedgerEntry.class
 com/enterprise/ledger/LedgerRepository.class
 com/enterprise/webhook/WebhookDeliveryRepository.class
 com/enterprise/feature/FeatureFlagRepository.class
+com/enterprise/api/AdminRootController.class
 com/enterprise/reliability/BackoffPolicy.class
 com/enterprise/api/AdminRefundController.class
 com/enterprise/currency/CurrencyHelper.class

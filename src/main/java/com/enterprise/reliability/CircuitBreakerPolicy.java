@@ -39,6 +39,10 @@ public class CircuitBreakerPolicy {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
+    // 👇 NEW: is_system field
+    @Column(name = "is_system", nullable = false)
+    private boolean isSystem = false;
+
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -69,4 +73,8 @@ public class CircuitBreakerPolicy {
 
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
+
+    // 👇 NEW: isSystem getter & setter
+    public boolean isSystem() { return isSystem; }
+    public void setSystem(boolean system) { isSystem = system; }
 }

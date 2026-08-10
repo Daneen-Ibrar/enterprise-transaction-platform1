@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/invoices")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminInvoiceController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminInvoiceController.class);

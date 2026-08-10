@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -19,4 +20,11 @@ public interface UserActivityLogRepository extends JpaRepository<UserActivityLog
 
     @Query("SELECT DISTINCT l.action FROM UserActivityLog l ORDER BY l.action")
     List<String> findDistinctActions();
+
+    // ===== Tenant‑aware findAll (for Merchant Admin) =====
+    @Query("SELECT l FROM UserActivityLog l WHERE l.tenantId = :tenantId ORDER BY l.createdAt DESC")
+    Page<UserActivityLog> findAllByTenantId(@Param("tenantId") Long tenantId, Pageable pageable);
+
+    @Query("SELECT COUNT(l) FROM UserActivityLog l WHERE l.tenantId = :tenantId")
+    long countByTenantId(@Param("tenantId") Long tenantId);
 }

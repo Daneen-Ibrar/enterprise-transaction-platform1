@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/suspicion-rules")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminSuspicionController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminSuspicionController.class);
@@ -52,9 +52,15 @@ public class AdminSuspicionController {
         this.objectMapper = objectMapper;
     }
 
+    private AppUser getCurrentAdmin(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+    }
+
     @GetMapping
-    public String listRules(Model model) {
-        List<SuspicionRule> rules = ruleRepository.findAll();
+    public String listRules(Model model, Authentication authentication) {
+        Long tenantId = getCurrentAdmin(authentication).getTenantId();
+        List<SuspicionRule> rules = ruleRepository.findAllByTenantId(tenantId);
         model.addAttribute("rules", rules);
         return "admin/suspicion-rules/list";
     }
@@ -75,7 +81,9 @@ public class AdminSuspicionController {
             AppUser admin = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
 
-            String condition = "#description.toLowerCase().contains(\"" + keyword.toLowerCase() + "\")";
+            // ✅ Safe SpEL expression – no method calls
+            String condition = "#description matches \"(?i).*" + keyword.toLowerCase() + ".*\"";
+
             SuspicionRule rule = new SuspicionRule();
             rule.setPriority(100);
             rule.setConditionExpression(condition);
@@ -129,7 +137,8 @@ public class AdminSuspicionController {
             oldRule.setActive(rule.isActive());
 
             if (keyword != null && !keyword.trim().isEmpty()) {
-                rule.setConditionExpression("#description.toLowerCase().contains(\"" + keyword.toLowerCase() + "\")");
+                // ✅ Safe SpEL expression
+                rule.setConditionExpression("#description matches \"(?i).*" + keyword.toLowerCase() + ".*\"");
             } else if (conditionExpression != null && !conditionExpression.trim().isEmpty()) {
                 rule.setConditionExpression(conditionExpression);
             }
@@ -217,9 +226,7 @@ public class AdminSuspicionController {
         AppUser admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
         Long tenantId = admin.getTenantId();
-        List<SuspicionRule> rules = ruleRepository.findAll().stream()
-                .filter(r -> r.getTenantId().equals(tenantId))
-                .collect(Collectors.toList());
+        List<SuspicionRule> rules = ruleRepository.findAllByTenantId(tenantId);
         try {
             String json = objectMapper.writeValueAsString(rules);
             return ResponseEntity.ok()
@@ -249,9 +256,7 @@ public class AdminSuspicionController {
                 rule.setTenantId(tenantId);
                 rule.setCreatedAt(LocalDateTime.now());
             }
-            List<SuspicionRule> existing = ruleRepository.findAll().stream()
-                    .filter(r -> r.getTenantId().equals(tenantId))
-                    .collect(Collectors.toList());
+            List<SuspicionRule> existing = ruleRepository.findAllByTenantId(tenantId);
             ruleRepository.deleteAll(existing);
             ruleRepository.saveAll(importedRules);
             suspicionService.reEvaluateAllInvoices();

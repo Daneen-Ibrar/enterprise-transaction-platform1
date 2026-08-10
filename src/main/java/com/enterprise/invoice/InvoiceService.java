@@ -2,6 +2,7 @@ package com.enterprise.invoice;
 
 import com.enterprise.audit.AuditService;
 import com.enterprise.events.SuspicionEnabledEvent;
+import com.enterprise.feature.FeatureFlagService;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
@@ -42,6 +43,7 @@ public class InvoiceService {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
+    private final FeatureFlagService featureFlagService;
 
     public InvoiceService(InvoiceRepository invoiceRepository,
                           NotificationService notificationService,
@@ -50,7 +52,8 @@ public class InvoiceService {
                           ApprovalService approvalService,
                           AuditService auditService,
                           ObjectMapper objectMapper,
-                          RestTemplate restTemplate) {
+                          RestTemplate restTemplate,
+                          FeatureFlagService featureFlagService) {
         this.invoiceRepository = invoiceRepository;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
@@ -59,6 +62,7 @@ public class InvoiceService {
         this.auditService = auditService;
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplate;
+        this.featureFlagService = featureFlagService;
     }
 
     // ===== PRIMARY CREATE INVOICE =====
@@ -522,6 +526,11 @@ public class InvoiceService {
 
     @Transactional
     public void reEvaluateAllInvoicesForSuspicion() {
+        if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
+            log.info("Suspicion detection is disabled – skipping re-evaluation");
+            return;
+        }
+
         log.info("🔄 Re-evaluating all invoices for suspicion");
         List<Invoice> allInvoices = invoiceRepository.findAll();
         int updated = 0;

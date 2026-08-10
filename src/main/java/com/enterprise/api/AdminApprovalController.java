@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/approval-rules")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminApprovalController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminApprovalController.class);
@@ -53,9 +53,16 @@ public class AdminApprovalController {
         this.objectMapper = objectMapper;
     }
 
+    private AppUser getCurrentAdmin(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+    }
+
     @GetMapping
-    public String index(@RequestParam(required = false) String search, Model model) {
-        List<ApprovalRule> rules = ruleRepository.findAll();
+    public String index(@RequestParam(required = false) String search, Model model, Authentication authentication) {
+        Long tenantId = getCurrentAdmin(authentication).getTenantId();
+        List<ApprovalRule> rules = ruleRepository.findAllByTenantId(tenantId);
+
         if (search != null && !search.isEmpty()) {
             String lowerSearch = search.toLowerCase();
             rules = rules.stream()
@@ -89,8 +96,11 @@ public class AdminApprovalController {
         try {
             AppUser admin = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
+            Long tenantId = admin.getTenantId();
 
-            ruleRepository.deleteAll();
+            // ✅ Only delete rules for THIS tenant
+            List<ApprovalRule> existing = ruleRepository.findAllByTenantId(tenantId);
+            ruleRepository.deleteAll(existing);
 
             ApprovalRule autoRule = new ApprovalRule();
             autoRule.setPriority(1);
@@ -98,8 +108,7 @@ public class AdminApprovalController {
             autoRule.setRequiresApproval(false);
             autoRule.setDescription("Amount £" + threshold + " or less – auto-approved");
             autoRule.setActive(true);
-            // ✅ FIX: Set tenant ID – fail closed
-            autoRule.setTenantId(TenantContext.getRequiredTenantId());
+            autoRule.setTenantId(tenantId);
             autoRule = ruleRepository.save(autoRule);
             ruleAuditService.logChange("APPROVAL", autoRule.getId(), "CREATE", null, autoRule, admin.getId());
 
@@ -109,7 +118,7 @@ public class AdminApprovalController {
             requireRule.setRequiresApproval(true);
             requireRule.setDescription("Amount over £" + threshold + " – requires approval");
             requireRule.setActive(true);
-            requireRule.setTenantId(TenantContext.getRequiredTenantId());
+            requireRule.setTenantId(tenantId);
             requireRule = ruleRepository.save(requireRule);
             ruleAuditService.logChange("APPROVAL", requireRule.getId(), "CREATE", null, requireRule, admin.getId());
 
@@ -251,9 +260,7 @@ public class AdminApprovalController {
         AppUser admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
         Long tenantId = admin.getTenantId();
-        List<ApprovalRule> rules = ruleRepository.findAll().stream()
-                .filter(r -> r.getTenantId().equals(tenantId))
-                .collect(Collectors.toList());
+        List<ApprovalRule> rules = ruleRepository.findAllByTenantId(tenantId);
         try {
             String json = objectMapper.writeValueAsString(rules);
             return ResponseEntity.ok()
@@ -285,9 +292,7 @@ public class AdminApprovalController {
                 rule.setCreatedAt(LocalDateTime.now());
             }
             // Delete existing rules for this tenant
-            List<ApprovalRule> existing = ruleRepository.findAll().stream()
-                    .filter(r -> r.getTenantId().equals(tenantId))
-                    .collect(Collectors.toList());
+            List<ApprovalRule> existing = ruleRepository.findAllByTenantId(tenantId);
             ruleRepository.deleteAll(existing);
             ruleRepository.saveAll(importedRules);
             invoiceService.reEvaluateAllInvoices();

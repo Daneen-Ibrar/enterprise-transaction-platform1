@@ -3,6 +3,7 @@ package com.enterprise.security;
 import com.enterprise.audit.UserActivityLogService;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
+import com.enterprise.tenant.TenantContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,6 +48,9 @@ public class CustomAuthenticationSuccessHandler extends SavedRequestAwareAuthent
                 log.info("   User: {}, locked: {}, attempts: {}",
                         user.getEmail(), user.isAccountLocked(), user.getFailedLoginAttempts());
 
+                // 👈 Set TenantContext before logging
+                TenantContext.setTenantId(user.getTenantId());
+
                 // Reset failed attempts and unlock if needed
                 loginAttemptService.loginSucceeded(user.getEmail());
 
@@ -61,13 +65,13 @@ public class CustomAuthenticationSuccessHandler extends SavedRequestAwareAuthent
                 // ===== ENFORCE 2FA FOR ADMIN USERS =====
                 boolean isAdmin = user.getRoles().stream()
                         .anyMatch(r -> r.getName().equals("ADMIN"));
-          if (isAdmin && !user.isTwoFactorEnabled()) {
-    log.info("🔐 Admin user {} must set up 2FA – redirecting to setup", email);
-    HttpSession session = request.getSession();
-    session.setAttribute("2FA_REQUIRED", true);
-    getRedirectStrategy().sendRedirect(request, response, "/2fa/setup?required=true");
-    return;
-}
+                if (isAdmin && !user.isTwoFactorEnabled()) {
+                    log.info("🔐 Admin user {} must set up 2FA – redirecting to setup", email);
+                    HttpSession session = request.getSession();
+                    session.setAttribute("2FA_REQUIRED", true);
+                    getRedirectStrategy().sendRedirect(request, response, "/2fa/setup?required=true");
+                    return;
+                }
 
                 if (user.isTwoFactorEnabled()) {
                     HttpSession session = request.getSession();

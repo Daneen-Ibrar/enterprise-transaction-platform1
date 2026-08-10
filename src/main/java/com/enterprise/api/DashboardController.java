@@ -78,12 +78,38 @@ public class DashboardController {
         AppUser user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Long userId = user.getId();
+        Long tenantId = user.getTenantId();
 
-        // Common stats
-        long totalTransactions = transactionRepository.count();
-        long totalAuditEvents = auditRepository.count();
-        long pendingDlq = dlqEntryRepository.countByStatus("PENDING");
-        long reconciled = reconciliationRecordRepository.count();
+        // ===== ROLE CHECKS =====
+        boolean isSuperAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("SUPER_ADMIN"));
+        boolean isMerchantAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("MERCHANT_ADMIN"));
+        boolean isMerchant = user.getRoles().stream().anyMatch(r -> r.getName().equals("MERCHANT"));
+        boolean isCustomer = user.getRoles().stream().anyMatch(r -> r.getName().equals("CUSTOMER"));
+
+        // Add role flags to the model
+        model.addAttribute("isSuperAdmin", isSuperAdmin);
+        model.addAttribute("isMerchantAdmin", isMerchantAdmin);
+        model.addAttribute("isMerchant", isMerchant);
+        model.addAttribute("isCustomer", isCustomer);
+
+        // ===== ROLE BADGE =====
+        if (isSuperAdmin) {
+            model.addAttribute("roleBadge", "Super Admin");
+        } else if (isMerchantAdmin) {
+            model.addAttribute("roleBadge", "Merchant Admin");
+        } else if (isMerchant) {
+            model.addAttribute("roleBadge", "Merchant");
+        } else if (isCustomer) {
+            model.addAttribute("roleBadge", "Customer");
+        } else {
+            model.addAttribute("roleBadge", "User");
+        }
+
+        // ===== COMMON STATS (tenant‑aware) =====
+        long totalTransactions = transactionRepository.countByTenantId(tenantId);
+        long totalAuditEvents = auditRepository.countByTenantId(tenantId);
+        long pendingDlq = dlqEntryRepository.countByTenantIdAndStatus(tenantId, "PENDING");
+        long reconciled = reconciliationRecordRepository.countByTenantId(tenantId);
 
         model.addAttribute("totalTransactions", totalTransactions);
         model.addAttribute("totalAuditEvents", totalAuditEvents);
@@ -97,19 +123,16 @@ public class DashboardController {
         model.addAttribute("unreadCount", unreadCount);
         model.addAttribute("notifications", recentNotifications);
 
-        // Suspicious invoices (admin only)
-        if (user.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"))) {
+        // ===== SUSPICIOUS INVOICES (Super Admin + Merchant Admin only) =====
+        if (isSuperAdmin || isMerchantAdmin) {
             long suspiciousCount = invoiceService.findAll().stream()
                     .filter(inv -> inv.getRiskLevel() != null && !"GREEN".equals(inv.getRiskLevel()))
                     .count();
             model.addAttribute("suspiciousCount", suspiciousCount);
         }
 
-        // ===== MERCHANT & CUSTOMER SPECIFIC DATA =====
-        boolean isMerchant = user.getRoles().stream().anyMatch(r -> r.getName().equals("MERCHANT"));
-        boolean isCustomer = user.getRoles().stream().anyMatch(r -> r.getName().equals("CUSTOMER"));
-
-        if (isMerchant) {
+        // ===== MERCHANT & MERCHANT_ADMIN SPECIFIC DATA =====
+        if (isMerchant || isMerchantAdmin) {
             List<Invoice> recentInvoices = invoiceRepository.findByMerchantIdOrderByCreatedAtDesc(userId)
                     .stream().limit(5).collect(Collectors.toList());
             model.addAttribute("recentInvoices", recentInvoices);
@@ -131,6 +154,7 @@ public class DashboardController {
             model.addAttribute("pendingApprovalCount", pendingApprovalCount);
         }
 
+        // ===== CUSTOMER SPECIFIC DATA =====
         if (isCustomer) {
             List<Invoice> recentInvoices = invoiceRepository.findByCustomerEmailOrderByCreatedAtDesc(user.getEmail())
                     .stream().limit(5).collect(Collectors.toList());
@@ -142,23 +166,21 @@ public class DashboardController {
         }
 
         // ===== MULTI-CURRENCY DASHBOARD =====
-        // Get tenant base currency
         Tenant tenant = tenantRepository.findById(user.getTenantId()).orElse(null);
         String baseCurrency = (tenant != null && tenant.getBaseCurrency() != null) ? tenant.getBaseCurrency() : "GBP";
         model.addAttribute("baseCurrency", baseCurrency);
 
-        // Convert total transaction volume to base currency
         BigDecimal totalVolume = BigDecimal.ZERO;
-        for (Transaction tx : transactionRepository.findAll()) {
+        for (Transaction tx : transactionRepository.findAllByTenantId(tenantId)) {
             totalVolume = totalVolume.add(exchangeRateService.convert(tx.getAmount(), tx.getCurrency(), baseCurrency));
         }
         model.addAttribute("totalVolume", totalVolume);
 
-        // Chart data (convert daily volumes to base currency)
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(7);
-        var volume = reportingService.getDailyVolume(startDate, endDate);
-        var statusDist = reportingService.getStatusDistribution(startDate, endDate);
+
+        var volume = reportingService.getDailyVolume(startDate, endDate, tenantId);
+        var statusDist = reportingService.getStatusDistribution(startDate, endDate, tenantId);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         List<String> labels = volume.keySet().stream().sorted().map(d -> d.format(formatter)).collect(Collectors.toList());
@@ -166,8 +188,7 @@ public class DashboardController {
                 .map(label -> {
                     LocalDate date = LocalDate.parse(label, formatter);
                     BigDecimal dailyTotal = BigDecimal.ZERO;
-                    // Sum transactions for that day (simplified – in real app, use query)
-                    for (Transaction tx : transactionRepository.findAll()) {
+                    for (Transaction tx : transactionRepository.findAllByTenantId(tenantId)) {
                         if (tx.getCreatedAt().toLocalDate().equals(date)) {
                             dailyTotal = dailyTotal.add(exchangeRateService.convert(tx.getAmount(), tx.getCurrency(), baseCurrency));
                         }
@@ -183,6 +204,9 @@ public class DashboardController {
         model.addAttribute("dashboardVolumeData", volumeData);
         model.addAttribute("dashboardStatusLabels", statusLabels);
         model.addAttribute("dashboardStatusValues", statusValues);
+        model.addAttribute("viewType", "merchant");
+        model.addAttribute("tenantId", user.getTenantId());
+        model.addAttribute("merchantId", userId);
 
         return "dashboard";
     }

@@ -5,6 +5,8 @@ import com.enterprise.audit.AuditEvent;
 import com.enterprise.audit.AuditEventSpecifications;
 import com.enterprise.audit.AuditRepository;
 import com.enterprise.audit.AuditService;
+import com.enterprise.identity.AppUser;
+import com.enterprise.identity.UserRepository;
 import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -22,10 +25,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/audit")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminAuditController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminAuditController.class);
@@ -33,13 +37,16 @@ public class AdminAuditController {
     private final AuditService auditService;
     private final AuditRepository auditRepository;
     private final AuditDiffService auditDiffService;
+    private final UserRepository userRepository;
 
     public AdminAuditController(AuditService auditService,
                                 AuditRepository auditRepository,
-                                AuditDiffService auditDiffService) {
+                                AuditDiffService auditDiffService,
+                                UserRepository userRepository) {
         this.auditService = auditService;
         this.auditRepository = auditRepository;
         this.auditDiffService = auditDiffService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping
@@ -51,16 +58,28 @@ public class AdminAuditController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            Model model) {
+            Model model,
+            Authentication authentication) {
 
-        Long tenantId = TenantContext.getTenantId();
+        // 👇 Get the current user
+        AppUser currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
+        boolean isSuperAdmin = currentUser.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("SUPER_ADMIN"));
+
+        // 👇 Build the specification
         Specification<AuditEvent> spec = Specification
                 .where(AuditEventSpecifications.hasUserId(userId))
                 .and(AuditEventSpecifications.hasEventType(eventType))
                 .and(AuditEventSpecifications.hasEntityType(entityType))
-                .and(AuditEventSpecifications.createdBetween(startDate, endDate))
-                .and(AuditEventSpecifications.hasTenantId(tenantId));
+                .and(AuditEventSpecifications.createdBetween(startDate, endDate));
+
+        // 👇 Only apply tenant filter if NOT Super Admin
+        if (!isSuperAdmin) {
+            Long tenantId = TenantContext.getTenantId();
+            spec = spec.and(AuditEventSpecifications.hasTenantId(tenantId));
+        }
 
         Page<AuditEvent> events = auditRepository.findAll(
                 spec,
@@ -69,7 +88,18 @@ public class AdminAuditController {
 
         boolean chainValid = auditService.verifyChain();
 
-        List<String> eventTypes = auditRepository.findDistinctEventTypesByTenantId(tenantId);
+        // Event types dropdown
+        List<String> eventTypes;
+        if (isSuperAdmin) {
+            eventTypes = auditRepository.findAll().stream()
+                    .map(AuditEvent::getEventType)
+                    .distinct()
+                    .sorted()
+                    .collect(Collectors.toList());
+        } else {
+            Long tenantId = TenantContext.getTenantId();
+            eventTypes = auditRepository.findDistinctEventTypesByTenantId(tenantId);
+        }
 
         model.addAttribute("events", events);
         model.addAttribute("currentPage", page);
@@ -105,7 +135,6 @@ public class AdminAuditController {
         return "admin/audit/verify-fragment";
     }
 
-    // ===== FIXED: DIFF VIEW =====
     @GetMapping("/diff/{eventId}")
     public String showDiff(@PathVariable Long eventId, Model model) {
         AuditEvent event = auditService.getEventById(eventId)
@@ -125,7 +154,7 @@ public class AdminAuditController {
 
         model.addAttribute("event", event);
         model.addAttribute("diffs", diffs != null ? diffs : new ArrayList<>());
-        model.addAttribute("error", errorMessage);  // This matches the template
+        model.addAttribute("error", errorMessage);
 
         return "admin/audit/diff";
     }

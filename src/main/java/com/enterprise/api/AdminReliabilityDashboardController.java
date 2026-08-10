@@ -15,7 +15,7 @@ import java.util.Map;
 
 @Controller
 @RequestMapping("/admin/reliability-dashboard")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class AdminReliabilityDashboardController {
 
     private final ReliabilityDashboardService dashboardService;

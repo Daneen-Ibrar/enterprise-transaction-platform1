@@ -30,25 +30,30 @@ public class ReportingService {
         this.exchangeRateService = exchangeRateService;
     }
 
-    public List<Transaction> getTransactionsBetween(LocalDate startDate, LocalDate endDate) {
+    // ===== CORE: Get transactions between dates with optional tenant filtering =====
+    public List<Transaction> getTransactionsBetween(LocalDate startDate, LocalDate endDate, Long tenantId) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
         return transactionRepository.findAll().stream()
                 .filter(tx -> tx.getCreatedAt().isAfter(start) && tx.getCreatedAt().isBefore(end))
+                .filter(tx -> tenantId == null || tx.getTenantId().equals(tenantId))
                 .collect(Collectors.toList());
     }
 
-    // Get tenant base currency
-    private String getBaseCurrency() {
-        Long tenantId = TenantContext.getTenantId();
-        if (tenantId == null) return "GBP";
+    // ===== Get tenant base currency =====
+    private String getBaseCurrency(Long tenantId) {
+        if (tenantId == null) {
+            // Super Admin – default to GBP
+            return "GBP";
+        }
         return tenantRepository.findById(tenantId)
                 .map(Tenant::getBaseCurrency)
                 .orElse("GBP");
     }
 
-    public Map<LocalDate, Long> getDailyVolume(LocalDate startDate, LocalDate endDate) {
-        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
+    // ===== DAILY VOLUME =====
+    public Map<LocalDate, Long> getDailyVolume(LocalDate startDate, LocalDate endDate, Long tenantId) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate, tenantId);
         return transactions.stream()
                 .collect(Collectors.groupingBy(
                         tx -> tx.getCreatedAt().toLocalDate(),
@@ -56,9 +61,10 @@ public class ReportingService {
                 ));
     }
 
-    public Map<LocalDate, BigDecimal> getDailyAverage(LocalDate startDate, LocalDate endDate) {
-        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
-        String baseCurrency = getBaseCurrency();
+    // ===== DAILY AVERAGE =====
+    public Map<LocalDate, BigDecimal> getDailyAverage(LocalDate startDate, LocalDate endDate, Long tenantId) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate, tenantId);
+        String baseCurrency = getBaseCurrency(tenantId);
         return transactions.stream()
                 .collect(Collectors.groupingBy(
                         tx -> tx.getCreatedAt().toLocalDate(),
@@ -71,9 +77,10 @@ public class ReportingService {
                 ));
     }
 
-    public Map<String, Object> getSummaryMetrics(LocalDate startDate, LocalDate endDate) {
-        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
-        String baseCurrency = getBaseCurrency();
+    // ===== SUMMARY METRICS =====
+    public Map<String, Object> getSummaryMetrics(LocalDate startDate, LocalDate endDate, Long tenantId) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate, tenantId);
+        String baseCurrency = getBaseCurrency(tenantId);
         long total = transactions.size();
         if (total == 0) {
             return Map.of(
@@ -108,8 +115,9 @@ public class ReportingService {
         );
     }
 
-    public Map<String, Long> getStatusDistribution(LocalDate startDate, LocalDate endDate) {
-        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
+    // ===== STATUS DISTRIBUTION =====
+    public Map<String, Long> getStatusDistribution(LocalDate startDate, LocalDate endDate, Long tenantId) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate, tenantId);
         return transactions.stream()
                 .collect(Collectors.groupingBy(
                         tx -> tx.getStatus().name(),
@@ -117,9 +125,10 @@ public class ReportingService {
                 ));
     }
 
-    public List<Map<String, Object>> getTopMerchants(LocalDate startDate, LocalDate endDate, int limit) {
-        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
-        String baseCurrency = getBaseCurrency();
+    // ===== TOP MERCHANTS =====
+    public List<Map<String, Object>> getTopMerchants(LocalDate startDate, LocalDate endDate, int limit, Long tenantId) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate, tenantId);
+        String baseCurrency = getBaseCurrency(tenantId);
         return transactions.stream()
                 .collect(Collectors.groupingBy(
                         Transaction::getMerchantId,
@@ -137,8 +146,9 @@ public class ReportingService {
                 .collect(Collectors.toList());
     }
 
-    public Map<LocalDate, Double> getDailySuccessRate(LocalDate startDate, LocalDate endDate) {
-        List<Transaction> transactions = getTransactionsBetween(startDate, endDate);
+    // ===== DAILY SUCCESS RATE =====
+    public Map<LocalDate, Double> getDailySuccessRate(LocalDate startDate, LocalDate endDate, Long tenantId) {
+        List<Transaction> transactions = getTransactionsBetween(startDate, endDate, tenantId);
         Map<LocalDate, List<Transaction>> byDay = transactions.stream()
                 .collect(Collectors.groupingBy(tx -> tx.getCreatedAt().toLocalDate()));
         Map<LocalDate, Double> result = new LinkedHashMap<>();

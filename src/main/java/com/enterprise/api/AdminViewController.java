@@ -27,7 +27,7 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/admin")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminViewController {
 
     private final TransactionRepository transactionRepository;
@@ -88,6 +88,7 @@ public class AdminViewController {
     // ⚠️ REMOVED: reconciliation() method – now handled by ReconciliationDetailController
 
     @GetMapping("/dlq")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String dlq(@RequestParam(defaultValue = "0") int page,
                       @RequestParam(defaultValue = "20") int size,
                       Model model) {

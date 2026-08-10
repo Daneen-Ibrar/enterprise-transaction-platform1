@@ -42,4 +42,11 @@ public interface AuditRepository extends JpaRepository<AuditEvent, Long>, JpaSpe
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(value = "SELECT * FROM audit_event WHERE entity_type = :entityType AND entity_id = :entityId ORDER BY id DESC LIMIT 1", nativeQuery = true)
     Optional<AuditEvent> findLastEventWithLock(@Param("entityType") String entityType, @Param("entityId") Long entityId);
+
+    // ===== NEW: Tenant‑aware findAll and count =====
+    @Query("SELECT a FROM AuditEvent a WHERE a.tenantId = :tenantId")
+    List<AuditEvent> findAllByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT COUNT(a) FROM AuditEvent a WHERE a.tenantId = :tenantId")
+    long countByTenantId(@Param("tenantId") Long tenantId);
 }

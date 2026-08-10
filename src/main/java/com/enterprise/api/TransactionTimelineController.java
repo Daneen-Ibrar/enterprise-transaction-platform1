@@ -15,7 +15,7 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/transactions")
-@PreAuthorize("hasAnyRole('ADMIN', 'MERCHANT', 'CUSTOMER')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN', 'MERCHANT', 'CUSTOMER')")  
 public class TransactionTimelineController {
 
     private final TransactionRepository transactionRepository;

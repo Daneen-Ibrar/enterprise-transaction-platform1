@@ -18,7 +18,7 @@ import java.io.PrintWriter;
 
 @RestController
 @RequestMapping("/export")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class ExportController {
 
     private final TransactionRepository transactionRepository;

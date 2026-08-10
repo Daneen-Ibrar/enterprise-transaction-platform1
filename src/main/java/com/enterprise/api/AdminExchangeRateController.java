@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 
 @Controller
 @RequestMapping("/admin/exchange-rates")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminExchangeRateController {
 
     private final ExchangeRateService exchangeRateService;

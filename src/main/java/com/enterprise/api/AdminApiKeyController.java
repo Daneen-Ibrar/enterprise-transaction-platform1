@@ -1,6 +1,7 @@
 package com.enterprise.api;
 
 import com.enterprise.apikey.ApiKey;
+import com.enterprise.apikey.ApiKeyRepository; // 👈 ADD THIS IMPORT
 import com.enterprise.apikey.ApiKeyResponse;
 import com.enterprise.apikey.ApiKeyService;
 import com.enterprise.identity.AppUser;
@@ -16,16 +17,24 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/api-keys")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminApiKeyController {
 
     private final ApiKeyService apiKeyService;
+    private final ApiKeyRepository apiKeyRepository; // 👈 ADD THIS
     private final UserRepository userRepository;
 
     public AdminApiKeyController(ApiKeyService apiKeyService,
+                                 ApiKeyRepository apiKeyRepository, // 👈 ADD THIS
                                  UserRepository userRepository) {
         this.apiKeyService = apiKeyService;
+        this.apiKeyRepository = apiKeyRepository; // 👈 ADD THIS
         this.userRepository = userRepository;
+    }
+
+    private AppUser getCurrentAdmin(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     // View page (HTML)
@@ -38,8 +47,12 @@ public class AdminApiKeyController {
     @GetMapping("/list")
     @ResponseBody
     public List<ApiKeyResponse> listKeys(@RequestParam(required = false) Boolean active,
-                                         @RequestParam(required = false) String search) {
-        List<ApiKey> allKeys = apiKeyService.getAllKeys();
+                                         @RequestParam(required = false) String search,
+                                         Authentication authentication) {
+        AppUser admin = getCurrentAdmin(authentication);
+        Long tenantId = admin.getTenantId();
+
+        List<ApiKey> allKeys = apiKeyRepository.findAllByTenantId(tenantId); // ✅ now works
 
         // Filter by active status
         if (active != null) {
@@ -48,7 +61,7 @@ public class AdminApiKeyController {
                     .collect(Collectors.toList());
         }
 
-        // Filter by search term (case-insensitive, keyValue or name)
+        // Filter by search term
         if (search != null && !search.trim().isEmpty()) {
             String term = search.trim().toLowerCase();
             allKeys = allKeys.stream()
@@ -69,9 +82,6 @@ public class AdminApiKeyController {
         AppUser admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         ApiKey key = apiKeyService.generateApiKey(admin, name);
-        
-        // The key is saved with the full keyValue (not truncated)
-        // So ApiKeyResponse will contain the full key
         return new ApiKeyResponse(key);
     }
 

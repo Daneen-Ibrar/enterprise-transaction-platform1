@@ -42,8 +42,80 @@
         <a href="/admin/users/exit-impersonation" class="btn" style="background: #f39c12; color: white;">Stop Impersonating</a>
     </div>
 
-    <h1>Welcome, <span sec:authentication="name">User</span></h1>
-    <p>Your roles: <span sec:authentication="authorities">ROLES</span></p>
+<h1>Welcome, <span sec:authentication="name">User</span></h1>
+
+<!-- Role Badge + Switch Button -->
+<div style="display: flex; align-items: center; gap: 15px; margin: 10px 0; flex-wrap: wrap;">
+    
+  <span style="
+    display: inline-block;
+    padding: 6px 18px;
+    background: #2d7a3a;
+    color: white;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+">
+    👤 <span th:text="${roleBadge}">User</span>
+</span>
+
+
+<div th:if="${isMerchant}" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+    <span style="
+        display: inline-block;
+        padding: 4px 14px;
+        background: #e0e0e0;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #333;
+    ">
+        🏢 Tenant ID: <strong th:text="${tenantId}">1</strong>
+    </span>
+    <span style="
+        display: inline-block;
+        padding: 4px 14px;
+        background: #e0e0e0;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #333;
+    ">
+        🆔 Merchant ID: <strong th:text="${merchantId}">2</strong>
+    </span>
+</div>
+<!-- Switch to Admin View – only visible on merchant dashboard -->
+<div th:if="${isMerchantAdmin and viewType == 'merchant'}" style="display: inline-block;">
+    <a href="/admin" style="
+        display: inline-block;
+        padding: 6px 18px;
+        background: #f39c12;
+        color: white;
+        border-radius: 20px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+    ">
+        🔄 Switch to Admin View
+    </a>
+</div>
+
+<!-- Switch to Merchant View – only visible on admin dashboard -->
+<div th:if="${isMerchantAdmin and viewType == 'admin'}" style="display: inline-block;">
+    <a href="/dashboard" style="
+        display: inline-block;
+        padding: 6px 18px;
+        background: #3498db;
+        color: white;
+        border-radius: 20px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+    ">
+        🔄 Switch to Merchant View
+    </a>
+</div>
+</div>
 
     <!-- Notification Bell -->
     <div class="notification-bell">

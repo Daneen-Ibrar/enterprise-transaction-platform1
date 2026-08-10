@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Circuit Breaker Policies</title>
     <style>
-        /* Same styles as retry/list.html */
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -67,7 +66,7 @@
                     <td th:text="${p.operationType}">payment</td>
                     <td th:text="${p.failureThreshold}">5</td>
                     <td th:text="${p.successThreshold}">3</td>
-                    <td th:text="${p.timeoutMs}">60000</td>
+                    <td th:text="${p.timeoutMs}">30000</td>
                     <td th:text="${p.evaluationWindowSec}">30</td>
                     <td><span class="badge" th:class="${p.active} ? 'badge-success' : 'badge-danger'" th:text="${p.active} ? 'Active' : 'Inactive'">Active</span></td>
                     <td class="actions">
@@ -75,7 +74,8 @@
                         <form th:action="'/admin/reliability/policies/circuit-breaker/' + ${p.id} + '/toggle'" method="post">
                             <button type="submit" class="btn btn-warning btn-sm">Toggle</button>
                         </form>
-                        <form th:action="'/admin/reliability/policies/circuit-breaker/' + ${p.id} + '/delete'" method="post" onsubmit="return confirm('Delete this policy?');">
+                        <!-- Delete only if NOT system -->
+                        <form th:if="${!p.system}" th:action="'/admin/reliability/policies/circuit-breaker/' + ${p.id} + '/delete'" method="post" onsubmit="return confirm('Delete this policy?');">
                             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>
                     </td>

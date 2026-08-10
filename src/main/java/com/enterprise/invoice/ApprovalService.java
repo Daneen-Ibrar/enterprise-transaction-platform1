@@ -1,5 +1,6 @@
 package com.enterprise.invoice;
 
+import com.enterprise.tenant.TenantContext; // 👈 ADD THIS IMPORT
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.expression.EvaluationContext;
@@ -23,7 +24,8 @@ public class ApprovalService {
     }
 
     public boolean evaluate(Invoice invoice) {
-        List<ApprovalRule> rules = ruleRepository.findByActiveTrueOrderByPriorityAsc();
+        Long tenantId = TenantContext.getRequiredTenantId(); // ✅ now works
+        List<ApprovalRule> rules = ruleRepository.findByTenantIdAndActiveTrue(tenantId);
 
         // ✅ Use SimpleEvaluationContext – safe, read-only, no method calls
         EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();

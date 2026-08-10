@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/refund-rules")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminRefundRuleController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminRefundRuleController.class);
@@ -49,9 +49,15 @@ public class AdminRefundRuleController {
         this.objectMapper = objectMapper;
     }
 
+    private AppUser getCurrentAdmin(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+    }
+
     @GetMapping
-    public String listRules(@RequestParam(required = false) String search, Model model) {
-        List<RefundRule> rules = ruleRepository.findAll();
+    public String listRules(@RequestParam(required = false) String search, Model model, Authentication authentication) {
+        Long tenantId = getCurrentAdmin(authentication).getTenantId();
+        List<RefundRule> rules = ruleRepository.findAllByTenantId(tenantId);
         if (search != null && !search.isEmpty()) {
             String lowerSearch = search.toLowerCase();
             rules = rules.stream()
@@ -85,16 +91,18 @@ public class AdminRefundRuleController {
         try {
             AppUser admin = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
+            Long tenantId = admin.getTenantId();
 
-            ruleRepository.deleteAll();
+            // ✅ Only delete rules for THIS tenant
+            List<RefundRule> existing = ruleRepository.findAllByTenantId(tenantId);
+            ruleRepository.deleteAll(existing);
 
             RefundRule allowRule = new RefundRule();
             allowRule.setRulePriority(1);
             allowRule.setConditionExpression("#amount <= " + threshold);
             allowRule.setAction("ALLOW");
             allowRule.setActive(true);
-            // ✅ FIX: Use required tenant ID – fail closed
-            allowRule.setTenantId(TenantContext.getRequiredTenantId());
+            allowRule.setTenantId(tenantId);
             allowRule = ruleRepository.save(allowRule);
             ruleAuditService.logChange("REFUND", allowRule.getId(), "CREATE", null, allowRule, admin.getId());
 
@@ -103,8 +111,7 @@ public class AdminRefundRuleController {
             denyRule.setConditionExpression("#amount > " + threshold);
             denyRule.setAction("DENY");
             denyRule.setActive(true);
-            // ✅ FIX: Use required tenant ID – fail closed
-            denyRule.setTenantId(TenantContext.getRequiredTenantId());
+            denyRule.setTenantId(tenantId);
             denyRule = ruleRepository.save(denyRule);
             ruleAuditService.logChange("REFUND", denyRule.getId(), "CREATE", null, denyRule, admin.getId());
 
@@ -242,9 +249,7 @@ public class AdminRefundRuleController {
         AppUser admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
         Long tenantId = admin.getTenantId();
-        List<RefundRule> rules = ruleRepository.findAll().stream()
-                .filter(r -> r.getTenantId().equals(tenantId))
-                .collect(Collectors.toList());
+        List<RefundRule> rules = ruleRepository.findAllByTenantId(tenantId);
         try {
             String json = objectMapper.writeValueAsString(rules);
             return ResponseEntity.ok()
@@ -274,9 +279,7 @@ public class AdminRefundRuleController {
                 rule.setTenantId(tenantId);
                 rule.setCreatedAt(LocalDateTime.now());
             }
-            List<RefundRule> existing = ruleRepository.findAll().stream()
-                    .filter(r -> r.getTenantId().equals(tenantId))
-                    .collect(Collectors.toList());
+            List<RefundRule> existing = ruleRepository.findAllByTenantId(tenantId);
             ruleRepository.deleteAll(existing);
             ruleRepository.saveAll(importedRules);
             redirectAttributes.addFlashAttribute("success",

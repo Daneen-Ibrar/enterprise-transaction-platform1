@@ -26,40 +26,47 @@ public class FeatureFlagService {
         this.eventPublisher = eventPublisher;
     }
 
-    @Cacheable(value = "featureFlags", key = "#name")
+    @Cacheable(value = "featureFlags", key = "#name + '_' + #tenantId")
     public boolean isEnabled(String name) {
-        log.debug("Checking feature flag: {}", name);
-        return repository.findByName(name)
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            log.warn("No tenant context – defaulting to false for flag: {}", name);
+            return false;
+        }
+        log.debug("Checking feature flag: {} for tenant {}", name, tenantId);
+        return repository.findByNameAndTenantId(name, tenantId)
                 .map(FeatureFlag::isEnabled)
                 .orElse(false);
     }
 
-    @CacheEvict(value = "featureFlags", key = "#name")
+    @CacheEvict(value = "featureFlags", key = "#name + '_' + #tenantId")
     @Transactional
     public void setEnabled(String name, boolean enabled) {
-        FeatureFlag flag = repository.findByName(name)
-                .orElseThrow(() -> new IllegalArgumentException("Feature flag not found: " + name));
+        Long tenantId = TenantContext.getRequiredTenantId();
+        FeatureFlag flag = repository.findByNameAndTenantId(name, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Feature flag not found: " + name + " for tenant " + tenantId));
         flag.setEnabled(enabled);
         flag.setUpdatedAt(LocalDateTime.now());
         repository.save(flag);
-        log.info("Feature flag {} set to {}", name, enabled);
+        log.info("Feature flag {} set to {} for tenant {}", name, enabled, tenantId);
 
         if ("SUSPICION_DETECTION".equals(name) && enabled) {
-            log.info("Suspicion detection enabled – publishing re-evaluation event");
+            log.info("Suspicion detection enabled for tenant {} – publishing re-evaluation event", tenantId);
             eventPublisher.publishEvent(new SuspicionEnabledEvent());
         }
     }
 
-    @CacheEvict(value = "featureFlags", key = "#name")
+    @CacheEvict(value = "featureFlags", key = "#name + '_' + #tenantId")
     @Transactional
     public FeatureFlag createFlag(String name, String description, boolean enabled) {
+        Long tenantId = TenantContext.getRequiredTenantId();
         FeatureFlag flag = new FeatureFlag();
         flag.setName(name);
         flag.setDescription(description);
         flag.setEnabled(enabled);
         flag.setUpdatedAt(LocalDateTime.now());
-        // ✅ FIX: Set tenant ID – fail closed
-        flag.setTenantId(TenantContext.getRequiredTenantId());
+        flag.setTenantId(tenantId);
         return repository.save(flag);
     }
 
@@ -69,6 +76,7 @@ public class FeatureFlagService {
     }
 
     public List<FeatureFlag> findAll() {
-        return repository.findAll();
+        Long tenantId = TenantContext.getRequiredTenantId();
+        return repository.findAllByTenantId(tenantId);
     }
 }

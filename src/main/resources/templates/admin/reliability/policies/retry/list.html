@@ -37,7 +37,6 @@
 </head>
 <body>
 
-    <!-- Toast Container -->
     <div id="toast-container" class="toast-container">
         <div th:if="${success}" class="toast toast-success" th:text="${success}"></div>
         <div th:if="${error}" class="toast toast-error" th:text="${error}"></div>
@@ -77,7 +76,8 @@
                         <form th:action="'/admin/reliability/policies/retry/' + ${p.id} + '/toggle'" method="post">
                             <button type="submit" class="btn btn-warning btn-sm">Toggle</button>
                         </form>
-                        <form th:action="'/admin/reliability/policies/retry/' + ${p.id} + '/delete'" method="post" onsubmit="return confirm('Delete this policy?');">
+                        <!-- Delete only if NOT system -->
+                        <form th:if="${!p.system}" th:action="'/admin/reliability/policies/retry/' + ${p.id} + '/delete'" method="post" onsubmit="return confirm('Delete this policy?');">
                             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>
                     </td>

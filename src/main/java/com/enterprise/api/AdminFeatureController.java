@@ -2,8 +2,10 @@ package com.enterprise.api;
 
 import com.enterprise.feature.FeatureFlag;
 import com.enterprise.feature.FeatureFlagService;
-import com.enterprise.tenant.TenantContext;
+import com.enterprise.identity.AppUser;
+import com.enterprise.identity.UserRepository;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -13,24 +15,36 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/admin/features")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminFeatureController {
 
     private final FeatureFlagService featureFlagService;
+    private final UserRepository userRepository;
 
-    public AdminFeatureController(FeatureFlagService featureFlagService) {
+    public AdminFeatureController(FeatureFlagService featureFlagService,
+                                  UserRepository userRepository) {
         this.featureFlagService = featureFlagService;
+        this.userRepository = userRepository;
+    }
+
+    private AppUser getCurrentAdmin(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     @GetMapping
-    public String listFeatures(Model model) {
+    public String listFeatures(Model model, Authentication authentication) {
+        Long tenantId = getCurrentAdmin(authentication).getTenantId();
         List<FeatureFlag> flags = featureFlagService.findAll();
         model.addAttribute("flags", flags);
         return "admin/features/list";
     }
 
-    @PostMapping("/{id}/toggle")
-    public String toggleFeature(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    // ===== Toggle supports both GET and POST =====
+    @RequestMapping(value = "/{id}/toggle", method = {RequestMethod.GET, RequestMethod.POST})
+    public String toggleFeature(@PathVariable Long id, 
+                                Authentication authentication,
+                                RedirectAttributes redirectAttributes) {
         FeatureFlag flag = featureFlagService.findAll().stream()
                 .filter(f -> f.getId().equals(id))
                 .findFirst()
@@ -50,9 +64,9 @@ public class AdminFeatureController {
     public String createFeature(@RequestParam String name,
                                 @RequestParam String description,
                                 @RequestParam(required = false) Boolean enabled,
+                                Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
-        // ----- FIX: Use the service that sets tenant ID -----
-        // The createFlag method in FeatureFlagService already sets tenant ID internally (see below)
+        AppUser admin = getCurrentAdmin(authentication);
         featureFlagService.createFlag(name, description, enabled != null && enabled);
         redirectAttributes.addFlashAttribute("success", "Feature created.");
         return "redirect:/admin/features";

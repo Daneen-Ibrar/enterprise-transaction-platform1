@@ -74,6 +74,7 @@
                         <form th:action="'/admin/reliability/policies/failure-classification/' + ${r.id} + '/toggle'" method="post">
                             <button type="submit" class="btn btn-warning btn-sm">Toggle</button>
                         </form>
+                        <!-- Failure rules are always deletable -->
                         <form th:action="'/admin/reliability/policies/failure-classification/' + ${r.id} + '/delete'" method="post" onsubmit="return confirm('Delete this rule?');">
                             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>

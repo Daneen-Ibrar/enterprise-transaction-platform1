@@ -21,7 +21,7 @@ import java.util.Map;
 
 @Controller
 @RequestMapping("/admin/refunds")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminRefundController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminRefundController.class);

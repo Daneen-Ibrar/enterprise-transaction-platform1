@@ -29,7 +29,7 @@ public class PdfExportService {
         this.reportingService = reportingService;
     }
 
-    public ByteArrayOutputStream generateReport(LocalDate startDate, LocalDate endDate) {
+    public ByteArrayOutputStream generateReport(LocalDate startDate, LocalDate endDate, Long tenantId) {  // 👈 add param
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             PdfWriter writer = new PdfWriter(out);
@@ -48,8 +48,7 @@ public class PdfExportService {
                     .setTextAlignment(TextAlignment.CENTER)
                     .setMarginBottom(20));
 
-            Map<String, Object> summary = reportingService.getSummaryMetrics(startDate, endDate);
-            // Table with 4 columns, each 25% width
+            Map<String, Object> summary = reportingService.getSummaryMetrics(startDate, endDate, tenantId);  // 👈 pass tenantId
             Table summaryTable = new Table(UnitValue.createPercentArray(new float[]{25, 25, 25, 25}));
             summaryTable.setWidth(UnitValue.createPercentValue(100));
 
@@ -61,7 +60,7 @@ public class PdfExportService {
             document.add(summaryTable);
             document.add(new Paragraph("\n"));
 
-            List<Transaction> transactions = reportingService.getTransactionsBetween(startDate, endDate);
+            List<Transaction> transactions = reportingService.getTransactionsBetween(startDate, endDate, tenantId);  // 👈 pass tenantId
             Table txTable = new Table(UnitValue.createPercentArray(new float[]{10, 10, 10, 10, 20, 20}));
             txTable.setWidth(UnitValue.createPercentValue(100));
 

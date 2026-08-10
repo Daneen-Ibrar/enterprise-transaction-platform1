@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/activity")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminActivityController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminActivityController.class);
@@ -63,10 +63,16 @@ public class AdminActivityController {
 
         Page<UserActivityLog> logs = activityLogService.search(userId, action, start, end, pageable);
 
-        // Get all users for dropdown (tenant-scoped)
-        List<AppUser> users = userRepository.findAll().stream()
-                .filter(u -> u.getTenantId().equals(admin.getTenantId()))
-                .collect(Collectors.toList());
+        // Get all users for dropdown (tenant-scoped unless Super Admin)
+        boolean isSuperAdmin = admin.getRoles().stream().anyMatch(r -> r.getName().equals("SUPER_ADMIN"));
+        List<AppUser> users;
+        if (isSuperAdmin) {
+            users = userRepository.findAll();
+        } else {
+            users = userRepository.findAll().stream()
+                    .filter(u -> u.getTenantId().equals(admin.getTenantId()))
+                    .collect(Collectors.toList());
+        }
 
         List<String> actions = activityLogService.getDistinctActions();
 
@@ -85,6 +91,7 @@ public class AdminActivityController {
         model.addAttribute("endDate", endDate);
         model.addAttribute("currentPage", page);
         model.addAttribute("totalPages", logs.getTotalPages());
+        model.addAttribute("isSuperAdmin", isSuperAdmin);
 
         return "admin/activity/list";
     }

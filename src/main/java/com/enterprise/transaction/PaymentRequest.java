@@ -30,6 +30,9 @@ public class PaymentRequest {
     // ✅ Description field – used for simulator tokens
     private String description;
 
+    // 👈 NEW: customerEmail field
+    private String customerEmail;  // This matches the JSON field "customerEmail"
+
     // Getters and setters
     public Long getInvoiceId() { return invoiceId; }
     public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
@@ -48,4 +51,8 @@ public class PaymentRequest {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    // 👈 NEW: getter and setter for customerEmail
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
 }

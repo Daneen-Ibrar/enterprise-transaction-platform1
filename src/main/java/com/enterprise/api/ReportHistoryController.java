@@ -19,7 +19,7 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/admin/reports")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class ReportHistoryController {
 
     private static final Logger log = LoggerFactory.getLogger(ReportHistoryController.class);

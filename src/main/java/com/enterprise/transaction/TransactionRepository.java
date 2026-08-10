@@ -22,4 +22,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
     // ===== USER-SPECIFIC METHODS =====
     List<Transaction> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
     List<Transaction> findByMerchantIdOrderByCreatedAtDesc(Long merchantId);
+
+    // ===== NEW: Tenant‑aware findAll and count =====
+    @Query("SELECT t FROM Transaction t WHERE t.tenantId = :tenantId")
+    List<Transaction> findAllByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.tenantId = :tenantId")
+    long countByTenantId(@Param("tenantId") Long tenantId);
 }

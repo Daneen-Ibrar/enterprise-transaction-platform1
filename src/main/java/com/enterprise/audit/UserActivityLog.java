@@ -29,6 +29,10 @@ public class UserActivityLog {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    // ===== NEW: tenantId field =====
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     // Transient field for display (not persisted)
     @Transient
     private String userEmail;
@@ -57,4 +61,8 @@ public class UserActivityLog {
 
     public String getUserEmail() { return userEmail; }
     public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+
+    // ===== NEW: getter and setter for tenantId =====
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

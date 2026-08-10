@@ -1,6 +1,7 @@
 package com.enterprise.invoice;
 
 import com.enterprise.feature.FeatureFlagService;
+import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -9,6 +10,8 @@ import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
+import com.enterprise.events.SuspicionEnabledEvent;
+import org.springframework.context.event.EventListener;
 
 import java.util.List;
 
@@ -30,6 +33,12 @@ public class SuspicionService {
         this.invoiceService = invoiceService;
     }
 
+    @EventListener
+public void onSuspicionEnabled(SuspicionEnabledEvent event) {
+    log.info("📢 Received SuspicionEnabledEvent – re-evaluating all invoices");
+    reEvaluateAllInvoices();
+}
+
     public SuspicionResult evaluate(Invoice invoice) {
         if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
             log.debug("Suspicion detection is disabled – returning GREEN");
@@ -41,10 +50,10 @@ public class SuspicionService {
         log.info("Description: '{}'", invoice.getDescription());
         log.info("Amount: {}", invoice.getAmount());
 
-        List<SuspicionRule> rules = ruleRepository.findByActiveTrueOrderByPriorityAsc();
+        Long tenantId = TenantContext.getRequiredTenantId();
+        List<SuspicionRule> rules = ruleRepository.findByTenantIdAndActiveTrue(tenantId);
         log.info("Rules count: {}", rules.size());
 
-        // ✅ Use SimpleEvaluationContext – safe, read-only, no method calls
         EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
         context.setVariable("amount", invoice.getAmount());
         context.setVariable("description", invoice.getDescription());
@@ -63,7 +72,6 @@ public class SuspicionService {
                 }
             } catch (Exception e) {
                 log.error("    ERROR: {}", e.getMessage());
-                // Fail secure: if rule evaluation fails, treat as GREEN (normal)
                 return new SuspicionResult("GREEN", "Rule evaluation error – defaulting to GREEN");
             }
         }
@@ -72,6 +80,11 @@ public class SuspicionService {
     }
 
     public void reEvaluateAllInvoices() {
+        // 👈 ADD THIS GUARD
+        if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
+            log.info("Suspicion detection is disabled – skipping re-evaluation");
+            return;
+        }
         invoiceService.reEvaluateAllInvoicesForSuspicion();
     }
 

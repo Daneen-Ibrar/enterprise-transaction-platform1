@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @Controller
-@RequestMapping("/admin/reliability")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class AdminReliabilityController {
 
     private final DlqEntryRepository dlqEntryRepository;

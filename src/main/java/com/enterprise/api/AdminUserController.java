@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/users")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class AdminUserController {
 
     private final UserRepository userRepository;
@@ -148,12 +148,13 @@ public class AdminUserController {
             user.setTenantId(admin.getTenantId());
         }
 
+        // ===== NEW: Default to MERCHANT_ADMIN =====
         if (roleIds != null && !roleIds.isEmpty()) {
             Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
             user.setRoles(roles);
         } else {
-            Role defaultRole = roleRepository.findByName("CUSTOMER")
-                    .orElseThrow(() -> new RuntimeException("Default role CUSTOMER not found"));
+            Role defaultRole = roleRepository.findByName("MERCHANT_ADMIN")
+                    .orElseThrow(() -> new RuntimeException("Default role MERCHANT_ADMIN not found"));
             user.getRoles().add(defaultRole);
         }
 
@@ -222,12 +223,13 @@ public class AdminUserController {
             user.setTenantId(tenantId);
         }
 
+        // ===== NEW: Default to MERCHANT_ADMIN =====
         if (roleIds != null && !roleIds.isEmpty()) {
             Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
             user.setRoles(roles);
         } else {
-            Role defaultRole = roleRepository.findByName("CUSTOMER")
-                    .orElseThrow(() -> new RuntimeException("Default role CUSTOMER not found"));
+            Role defaultRole = roleRepository.findByName("MERCHANT_ADMIN")
+                    .orElseThrow(() -> new RuntimeException("Default role MERCHANT_ADMIN not found"));
             user.getRoles().clear();
             user.getRoles().add(defaultRole);
         }
@@ -280,7 +282,6 @@ public class AdminUserController {
         return "redirect:/admin/users";
     }
 
-    // ✅ FIXED: Revoke method now redirects with flash message
     @PostMapping("/revoke/{userId}")
     public String revokeUserById(@PathVariable Long userId,
                                  Authentication authentication,

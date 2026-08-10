@@ -17,6 +17,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReliabilityController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReliabilityDashboardController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminReliabilityPolicyController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminRootController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminRuleAuditController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminSuspicionController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminTenantController.java
@@ -43,9 +44,8 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/NotificationController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/NotificationSSEController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PaymentController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PaymentPageController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PrivateChatController.java
-/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PublicApiController.java
-/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PublicPaymentController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/ReconciliationDetailController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/RecurringScheduleController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/ReportConfigController.java

@@ -42,24 +42,27 @@ public class ReportScheduler {
     @Scheduled(cron = "0 0 9 * * MON")
     public void sendWeeklyReport() {
         log.info("Generating weekly report...");
-        generateAndStoreReport("WEEKLY", 7);
+        // For scheduled reports, we use tenant 1 as default
+        Long tenantId = 1L;
+        generateAndStoreReport("WEEKLY", 7, tenantId);
     }
 
     // Daily summary – every day at 6 PM
     @Scheduled(cron = "0 0 18 * * *")
     public void sendDailySummary() {
         log.info("Generating daily summary...");
-        generateAndStoreReport("DAILY", 1);
+        Long tenantId = 1L;
+        generateAndStoreReport("DAILY", 1, tenantId);
     }
 
-    private void generateAndStoreReport(String reportType, int daysBack) {
+    private void generateAndStoreReport(String reportType, int daysBack, Long tenantId) {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(daysBack);
         String dateRange = startDate.format(DateTimeFormatter.ISO_LOCAL_DATE) + " to " + endDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
 
         try {
-            // Generate PDF
-            byte[] pdfBytes = pdfExportService.generateReport(startDate, endDate).toByteArray();
+            // Generate PDF – 👈 now passing tenantId
+            byte[] pdfBytes = pdfExportService.generateReport(startDate, endDate, tenantId).toByteArray();
 
             // Store in database
             String filename = reportType.toLowerCase() + "_report_" + startDate + ".pdf";

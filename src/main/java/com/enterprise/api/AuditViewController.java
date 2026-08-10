@@ -22,7 +22,7 @@ import java.util.Map;
 
 @Controller
 @RequestMapping("/audit")
-@PreAuthorize("hasAnyRole('ADMIN', 'AUDITOR')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN', 'AUDITOR')") 
 public class AuditViewController {
 
     private final AuditRepository auditRepository;

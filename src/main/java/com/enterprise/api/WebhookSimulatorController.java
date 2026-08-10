@@ -14,7 +14,7 @@ import java.util.Map;
 
 @Controller
 @RequestMapping("/admin/webhooks/simulator")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')")
 public class WebhookSimulatorController {
 
     private final RestTemplate restTemplate;
