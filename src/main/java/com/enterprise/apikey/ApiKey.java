@@ -3,9 +3,13 @@ package com.enterprise.apikey;
 import com.enterprise.identity.AppUser;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
-@Table(name = "api_key")
+@Table(name = "api_key", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"key_value", "tenant_id"})
+})
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ApiKey {
 
     @Id

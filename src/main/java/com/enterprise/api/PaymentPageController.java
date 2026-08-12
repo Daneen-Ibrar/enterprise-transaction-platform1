@@ -22,6 +22,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -37,7 +38,7 @@ public class PaymentPageController {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final RestTemplate restTemplate;  // 👈 ADD THIS
+    private final RestTemplate restTemplate;
 
     public PaymentPageController(InvoiceService invoiceService,
                                  TransactionService transactionService,
@@ -50,10 +51,9 @@ public class PaymentPageController {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
-        this.restTemplate = restTemplate;  // 👈 ADD THIS
+        this.restTemplate = restTemplate;
     }
 
-    // ===== SHOW PAYMENT PAGE =====
     @GetMapping("/{invoiceId}")
     public String paymentPage(@PathVariable Long invoiceId, Model model) {
         Invoice invoice = invoiceService.findById(invoiceId)
@@ -68,7 +68,6 @@ public class PaymentPageController {
         return "payment/gateway";
     }
 
-    // ===== PROCESS PAYMENT =====
     @PostMapping("/{invoiceId}")
     public String processPayment(
             @PathVariable Long invoiceId,
@@ -90,7 +89,7 @@ public class PaymentPageController {
             Long tenantId = invoice.getTenantId() != null ? invoice.getTenantId() : 1L;
             TenantContext.setTenantId(tenantId);
 
-            // ===== CREATE OR FIND CUSTOMER =====
+            // Create or find customer
             AppUser customer = userRepository.findByEmail(invoice.getCustomerEmail())
                     .orElseGet(() -> {
                         try {
@@ -104,13 +103,12 @@ public class PaymentPageController {
                             newUser.setTenantId(tenantId);
                             return userRepository.save(newUser);
                         } catch (DataIntegrityViolationException e) {
-                            // Race condition: user created by another request
                             return userRepository.findByEmail(invoice.getCustomerEmail())
                                     .orElseThrow(() -> new RuntimeException("User creation race condition"));
                         }
                     });
 
-            // ===== PROCESS PAYMENT =====
+            // Process payment
             PaymentRequest request = new PaymentRequest();
             request.setInvoiceId(invoiceId);
             request.setCustomerId(customer.getId());
@@ -123,34 +121,45 @@ public class PaymentPageController {
             if ("SETTLED".equals(response.getStatus())) {
                 invoiceService.markAsPaid(invoiceId, response.getTransactionId());
 
-                // 👈 SEND WEBHOOK TO WOOCOMMERCE
-                if (invoice.getWebhookUrl() != null && !invoice.getWebhookUrl().isEmpty()) {
-                    log.info("📤 Sending webhook to {}", invoice.getWebhookUrl());
-                    Map<String, Object> payload = Map.of(
-                            "orderId", invoice.getWooOrderId(),
-                            "status", response.getStatus(),
-                            "transactionId", response.getTransactionId(),
-                            "invoiceId", invoiceId
-                    );
+                // ✅ FIX: Use HashMap instead of Map.of() to handle null values
+                // And check if webhookUrl is a valid HTTP URL
+                String webhookUrl = invoice.getWebhookUrl();
+                boolean isValidWebhookUrl = webhookUrl != null &&
+                        !webhookUrl.isEmpty() &&
+                        !webhookUrl.startsWith("xero:") &&
+                        !webhookUrl.startsWith("00000000-0000-0000-0000-000000000000") &&
+                        (webhookUrl.startsWith("http://") || webhookUrl.startsWith("https://"));
+
+                if (isValidWebhookUrl) {
+                    log.info("📤 Sending webhook to {}", webhookUrl);
+
+                    // ✅ Use HashMap to avoid null pointer issues
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("orderId", invoice.getWooOrderId() != null ? invoice.getWooOrderId() : invoiceId);
+                    payload.put("status", response.getStatus() != null ? response.getStatus() : "SETTLED");
+                    payload.put("transactionId", response.getTransactionId() != null ? response.getTransactionId() : -1L);
+                    payload.put("invoiceId", invoiceId);
+
                     HttpHeaders headers = new HttpHeaders();
                     headers.setContentType(MediaType.APPLICATION_JSON);
                     HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
                     try {
-                        restTemplate.postForEntity(invoice.getWebhookUrl(), entity, String.class);
+                        restTemplate.postForEntity(webhookUrl, entity, String.class);
                         log.info("✅ Webhook sent successfully");
                     } catch (Exception e) {
                         log.error("❌ Webhook failed: {}", e.getMessage());
                     }
+                } else {
+                    log.info("⏭️ Skipping webhook - webhookUrl is not valid HTTP URL: {}", webhookUrl);
                 }
 
-                // 👈 REDIRECT TO WOOCOMMERCE ORDER CONFIRMATION
+                // Redirect to WooCommerce if configured
                 if (invoice.getReturnUrl() != null && !invoice.getReturnUrl().isEmpty() && invoice.getWooOrderId() != null) {
                     String orderKey = invoice.getOrderKey() != null ? invoice.getOrderKey() : "wc_order_" + invoice.getWooOrderId();
                     String redirect = invoice.getReturnUrl() + "/" + invoice.getWooOrderId() + "/?key=" + orderKey;
-                    log.info("🔀 Redirecting to: " + redirect);
+                    log.info("🔀 Redirecting to: {}", redirect);
                     return "redirect:" + redirect;
                 } else {
-                    log.warn("⚠️ Cannot redirect: returnUrl or orderId is missing");
                     model.addAttribute("response", response);
                     return "payment/result";
                 }
@@ -162,6 +171,7 @@ public class PaymentPageController {
         } catch (Exception e) {
             log.error("Payment error", e);
             model.addAttribute("error", "Payment failed: " + e.getMessage());
+            
             return "payment/error";
         } finally {
             TenantContext.clear();

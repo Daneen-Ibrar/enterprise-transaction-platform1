@@ -2,9 +2,11 @@ package com.enterprise.job;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "job")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Job {
 
     @Id

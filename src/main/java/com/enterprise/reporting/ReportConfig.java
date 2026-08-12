@@ -2,9 +2,11 @@ package com.enterprise.reporting;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "report_config")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ReportConfig {
 
     @Id

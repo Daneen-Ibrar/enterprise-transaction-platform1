@@ -16,7 +16,9 @@ com/enterprise/api/ReportingController.class
 com/enterprise/security/RateLimitService$RateLimitType.class
 com/enterprise/reliability/RetryPolicy.class
 com/enterprise/api/AdminApprovalController$1.class
+com/enterprise/xero/service/XeroOAuthService$XeroCredentials.class
 com/enterprise/audit/AuditService.class
+com/enterprise/xero/config/XeroConfig.class
 com/enterprise/apikey/ApiKeyRepository.class
 com/enterprise/currency/CurrencyCodes.class
 com/enterprise/refund/RefundAggregate.class
@@ -51,6 +53,7 @@ com/enterprise/api/AdminBulkController.class
 com/enterprise/webhook/WebhookConfigRepository.class
 com/enterprise/api/AdminReconciliationController.class
 com/enterprise/feature/FeatureFlag.class
+com/enterprise/controller/xero/XeroSetupController.class
 com/enterprise/api/PrivateChatController.class
 com/enterprise/refund/RefundService.class
 com/enterprise/audit/AuditDiffService.class
@@ -77,6 +80,7 @@ com/enterprise/api/AdminFeatureController.class
 com/enterprise/api/AdminRefundRuleController.class
 com/enterprise/identity/PermissionRepository.class
 com/enterprise/transaction/TransactionStatus.class
+com/enterprise/config/WooCommerceController$WooCommerceOrder.class
 com/enterprise/api/AuditController.class
 com/enterprise/reporting/PdfExportService.class
 com/enterprise/web/TenantInterceptor.class
@@ -93,7 +97,6 @@ com/enterprise/invoice/RecurringScheduleService$1.class
 com/enterprise/identity/UserRepository.class
 com/enterprise/scheduler/ReportScheduler.class
 com/enterprise/api/AdminReliabilityDashboardController.class
-com/enterprise/api/WooCommerceController.class
 com/enterprise/invoice/Invoice.class
 com/enterprise/simulator/SimulatorService$SimulatorResult.class
 com/enterprise/reliability/ReliabilityAspect.class
@@ -113,6 +116,7 @@ com/enterprise/api/AdminActivityController.class
 com/enterprise/identity/RoleRepository.class
 com/enterprise/invoice/SuspicionService.class
 com/enterprise/reconciliation/ReconciliationDetail.class
+com/enterprise/aop/TenantFilterDefinition.class
 com/enterprise/identity/TestUserInitializer.class
 com/enterprise/api/AdminApiKeyController.class
 com/enterprise/validation/ValidIdempotencyKey.class
@@ -126,10 +130,13 @@ com/enterprise/currency/ExchangeRate.class
 com/enterprise/idempotency/IdempotencyKey.class
 com/enterprise/transaction/PaymentRequest.class
 com/enterprise/audit/RuleAudit.class
+com/enterprise/xero/service/XeroOAuthService.class
+com/enterprise/config/WooCommerceController.class
 com/enterprise/config/SecurityConfig.class
 com/enterprise/ledger/LedgerService.class
 com/enterprise/api/GlobalExceptionHandler.class
 com/enterprise/job/Job.class
+com/enterprise/controller/xero/XeroController.class
 com/enterprise/transaction/TransactionRepository.class
 com/enterprise/audit/AuditEventDTO.class
 com/enterprise/api/AdminReliabilityController.class
@@ -152,7 +159,6 @@ com/enterprise/invoice/SuspicionRuleRepository.class
 com/enterprise/apikey/ApiKey.class
 com/enterprise/audit/UserActivityLogSpecifications.class
 com/enterprise/config/I18nConfig.class
-com/enterprise/api/WooCommerceController$WooCommerceOrder.class
 com/enterprise/identity/Permission.class
 com/enterprise/invoice/PrivateMessageService.class
 com/enterprise/security/BackupCode.class
@@ -172,6 +178,7 @@ com/enterprise/api/NotificationSSEController.class
 com/enterprise/reporting/ExcelExportService.class
 com/enterprise/notification/NotificationService.class
 com/enterprise/notification/RealEmailService.class
+com/enterprise/config/WooCommerceController$WooCommerceResponse.class
 com/enterprise/events/TransactionSettledEvent.class
 com/enterprise/reliability/CircuitBreakerPolicyRepository.class
 com/enterprise/reliability/DlqEntry.class
@@ -179,6 +186,7 @@ com/enterprise/invoice/InvoiceMessageService.class
 com/enterprise/config/AppConfig.class
 com/enterprise/api/CurrencyControllerAdvice.class
 com/enterprise/reporting/GeneratedReport.class
+com/enterprise/xero/service/XeroInvoiceService.class
 com/enterprise/money/Money.class
 com/enterprise/transaction/Transaction.class
 com/enterprise/api/NotificationController.class
@@ -188,6 +196,7 @@ com/enterprise/api/AdminTenantController.class
 com/enterprise/api/GlobalControllerAdvice.class
 com/enterprise/api/HomeController.class
 com/enterprise/currency/ExchangeRateRepository.class
+com/enterprise/xero/entity/XeroToken.class
 com/enterprise/refund/RefundService$RefundEligibility.class
 com/enterprise/reliability/RetryPolicyRepository.class
 com/enterprise/audit/RuleAuditRepository.class
@@ -233,6 +242,7 @@ com/enterprise/validation/IdempotencyKeyValidator.class
 com/enterprise/reporting/ExportService.class
 com/enterprise/refund/RefundRule.class
 com/enterprise/reporting/ReportConfigRepository.class
+com/enterprise/xero/repository/XeroTokenRepository.class
 com/enterprise/api/AdminLockController.class
 com/enterprise/api/AdminUserController.class
 com/enterprise/audit/RuleAuditService.class
@@ -243,6 +253,5 @@ com/enterprise/audit/AuditRepository.class
 com/enterprise/simulator/SimulatorToken.class
 com/enterprise/config/AsyncConfig.class
 com/enterprise/api/AdminReliabilityPolicyController.class
-com/enterprise/api/WooCommerceController$WooCommerceResponse.class
 com/enterprise/reconciliation/ReconciliationRecord.class
 com/enterprise/reliability/ReliabilityPolicyService.class

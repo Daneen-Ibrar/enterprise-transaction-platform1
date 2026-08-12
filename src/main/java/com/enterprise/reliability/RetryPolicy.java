@@ -2,9 +2,13 @@ package com.enterprise.reliability;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
-@Table(name = "retry_policy")
+@Table(name = "retry_policy", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"tenant_id", "operation_type"})
+})
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class RetryPolicy {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

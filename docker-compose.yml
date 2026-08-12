@@ -27,6 +27,8 @@ services:
                -c tcp_keepalives_interval=10
                -c tcp_keepalives_count=5
                -c idle_in_transaction_session_timeout=60000
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -40,6 +42,8 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+    volumes:
+      - redis_data:/data
 
   app:
     build: .
@@ -51,12 +55,19 @@ services:
       redis:
         condition: service_healthy
     environment:
+      # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/transaction_platform
       SPRING_DATASOURCE_USERNAME: platform_user
       SPRING_DATASOURCE_PASSWORD: dev_password
+
+      # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+
+      # Server
       SERVER_FORWARD_HEADERS_STRATEGY: native
+
+      # Test Users
       TEST_CUSTOMER_EMAIL: customer@test.com
       TEST_CUSTOMER_PASSWORD: password123
       TEST_MERCHANT_EMAIL: merchant@test.com
@@ -65,6 +76,7 @@ services:
       TEST_ADMIN_PASSWORD: password123
       TEST_AUDITOR_EMAIL: auditor@test.com
       TEST_AUDITOR_PASSWORD: password123
+
       # Gmail SMTP
       APP_EMAIL_MODE: smtp
       MAIL_HOST: smtp.gmail.com
@@ -73,7 +85,15 @@ services:
       MAIL_PASSWORD: rrakleuwvhmtanfz
       MAIL_SMTP_AUTH: true
       MAIL_STARTTLS: true
+
+      # XERO OAUTH - ✅ FIXED: Use the correct redirect URI
+      XERO_CLIENT_ID: 2512F3F3920940CBA50AFDE55D61D9C6
+      XERO_CLIENT_SECRET: HRr50i4hY0B_bBIpeJNN61LhcvPc74J9ndOCIErA2GnccMqh
+      XERO_REDIRECT_URI: https://fluffy-trout-9pprj57j7xpf75pq-8080.app.github.dev/admin/xero/callback
+
+      # Java Options
       JAVA_OPTS: "-Xmx512m -Xms256m -Dnetworkaddress.cache.ttl=10 -Dnetworkaddress.cache.negative.ttl=10"
+
     restart: unless-stopped
     deploy:
       resources:
@@ -83,6 +103,10 @@ services:
           memory: 512M
     networks:
       - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
 
 networks:
   app-network:

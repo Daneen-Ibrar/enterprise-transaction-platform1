@@ -17,6 +17,9 @@
         .btn:hover { opacity: 0.8; }
         .role-badge { display: inline-block; padding: 6px 18px; background: #2d7a3a; color: white; border-radius: 20px; font-weight: 600; font-size: 14px; }
         .section { margin: 30px 0; }
+        .xero-status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+        .xero-connected { background: #d4edda; color: #155724; }
+        .xero-disconnected { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -34,6 +37,8 @@
                 </a>
             </div>
         </div>
+
+ 
 
         <!-- Stats Cards -->
         <div class="card-grid">
@@ -85,6 +90,8 @@
                 <a href="/admin/locks">🔒 Locked Users</a>
                 <a href="/admin/suspicion-rules">⚠️ Suspicion Rules</a>
                 <a href="/admin/tenants" th:if="${isSuperAdmin}">🏢 Manage Tenants</a>
+                <a href="/admin/xero/setup">📊 Xero Setup</a>
+                <a href="/admin/xero">📊 Xero Dashboard</a>
             </div>
         </div>
 

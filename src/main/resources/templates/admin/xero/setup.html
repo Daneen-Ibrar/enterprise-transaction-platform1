@@ -1,0 +1,87 @@
+<!-- src/main/resources/templates/admin/xero/setup.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Xero Setup</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Xero Integration Setup</h1>
+        
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Connection Status</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Tenant ID:</strong> <span th:text="${tenantId}"></span></p>
+                <p><strong>Status:</strong> 
+                    <span th:if="${isConnected}" class="badge bg-success">✅ Connected</span>
+                    <span th:unless="${isConnected}" class="badge bg-danger">❌ Not Connected</span>
+                </p>
+                <p th:if="${hasCustomCreds}" class="text-info">🔑 Using custom credentials</p>
+                <p th:unless="${hasCustomCreds}" class="text-secondary">Using default system credentials</p>
+            </div>
+        </div>
+
+        <!-- Custom Credentials Form -->
+        <div class="card mt-4" th:unless="${isConnected}">
+            <div class="card-header">
+                <h5>Connect Your Xero Account</h5>
+            </div>
+            <div class="card-body">
+                <p>Enter your Xero App credentials to connect your account.</p>
+                <form th:action="@{/admin/xero/setup/connect}" method="post">
+                    <div class="mb-3">
+                        <label for="clientId" class="form-label">Xero Client ID</label>
+                        <input type="text" class="form-control" id="clientId" name="clientId" required 
+                               placeholder="Enter your Xero Client ID">
+                        <small class="text-muted">Find this in your Xero Developer Portal → My Apps → Configuration</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="clientSecret" class="form-label">Xero Client Secret</label>
+                        <input type="password" class="form-control" id="clientSecret" name="clientSecret" required
+                               placeholder="Enter your Xero Client Secret">
+                        <small class="text-muted">Generate this in your Xero Developer Portal</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">🔗 Connect to Xero</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card mt-4" th:if="${isConnected}">
+            <div class="card-header">
+                <h5>Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2">
+                    <form th:action="@{/admin/xero/setup/disconnect}" method="post">
+                        <button type="submit" class="btn btn-danger">🔌 Disconnect</button>
+                    </form>
+                    <a th:href="@{/admin/xero}" class="btn btn-primary">📊 Go to Xero Dashboard</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>How to get your Xero credentials</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>Go to <a href="https://developer.xero.com/myapps/" target="_blank">Xero Developer Portal</a></li>
+                    <li>Create a new app or select an existing one</li>
+                    <li>Copy the <strong>Client ID</strong> from the Configuration tab</li>
+                    <li>Click <strong>"Generate a secret"</strong> and copy it</li>
+                    <li>Enter both above and click "Connect to Xero"</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

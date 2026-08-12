@@ -2,9 +2,11 @@ package com.enterprise.idempotency;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "idempotency_key")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class IdempotencyKey {
 
     @Id

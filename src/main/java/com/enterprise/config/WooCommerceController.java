@@ -1,4 +1,4 @@
-package com.enterprise.api;
+package com.enterprise.config;
 
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.Role;

@@ -2,9 +2,11 @@ package com.enterprise.notification;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "email_log")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class EmailLog {
 
     @Id

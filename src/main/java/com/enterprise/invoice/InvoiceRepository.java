@@ -4,6 +4,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,4 +31,19 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long>, JpaSpec
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Invoice i WHERE i.id = :id")
     Optional<Invoice> findByIdWithLock(@Param("id") Long id);
+
+    // ===== SUSPICION RE-EVALUATION QUERIES =====
+    // Native query to bypass tenant filter - gets ALL invoices across ALL tenants
+    @Query(value = "SELECT * FROM invoice WHERE status NOT IN ('PAID', 'REJECTED')", nativeQuery = true)
+    List<Invoice> findAllInvoicesForReevaluation();
+
+    // Tenant-aware re-evaluation query
+    @Query(value = "SELECT * FROM invoice WHERE tenant_id = :tenantId AND status NOT IN ('PAID', 'REJECTED')", nativeQuery = true)
+    List<Invoice> findAllByTenantIdForReevaluation(@Param("tenantId") Long tenantId);
+
+    // ===== NATIVE UPDATE TO BYPASS TENANT FILTER =====
+    // ✅ ADD THIS METHOD - this is what's missing!
+    @Modifying
+    @Query(value = "UPDATE invoice SET risk_level = :riskLevel, suspicion_reason = :reason, updated_at = CURRENT_TIMESTAMP WHERE id = :id", nativeQuery = true)
+    void updateRiskLevel(@Param("id") Long id, @Param("riskLevel") String riskLevel, @Param("reason") String reason);
 }

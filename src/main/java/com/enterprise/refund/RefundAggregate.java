@@ -3,9 +3,11 @@ package com.enterprise.refund;
 import com.enterprise.money.Money;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "refund")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class RefundAggregate {
 
     @Id

@@ -2,9 +2,13 @@ package com.enterprise.feature;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
-@Table(name = "feature_flag")
+@Table(name = "feature_flag", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"name", "tenant_id"})
+})
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class FeatureFlag {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,9 +1,8 @@
 package com.enterprise.audit;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.Filter;
-
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "audit_event")

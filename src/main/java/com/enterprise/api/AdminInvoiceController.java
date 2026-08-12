@@ -193,34 +193,37 @@ public class AdminInvoiceController {
         return "redirect:/admin/invoices/pending";
     }
 
-    // ===== SUSPICIOUS INVOICES =====
-    @GetMapping("/suspicious")
-    public String suspiciousInvoices(Model model) {
-        try {
-            boolean suspicionEnabled = featureFlagService.isEnabled("SUSPICION_DETECTION");
-            model.addAttribute("suspicionEnabled", suspicionEnabled);
+@GetMapping("/suspicious")
+public String suspiciousInvoices(Model model) {
+    try {
+        boolean suspicionEnabled = featureFlagService.isEnabled("SUSPICION_DETECTION");
+        model.addAttribute("suspicionEnabled", suspicionEnabled);
 
-            if (suspicionEnabled) {
-                List<Invoice> allPending = invoiceService.getPendingApprovalInvoices();
-                List<Invoice> suspicious = allPending.stream()
-                        .filter(inv -> {
-                            String risk = inv.getRiskLevel();
-                            return risk != null && !"GREEN".equals(risk);
-                        })
-                        .collect(Collectors.toList());
-                model.addAttribute("invoices", suspicious);
-            } else {
-                model.addAttribute("invoices", Collections.emptyList());
-            }
-            return "admin/invoices/suspicious";
-        } catch (Exception e) {
-            log.error("Error loading suspicious invoices", e);
-            model.addAttribute("error", "Failed to load suspicious invoices: " + e.getMessage());
+        if (suspicionEnabled) {
+            // ✅ Get ALL pending invoices with RED or YELLOW risk
+            List<Invoice> allPending = invoiceService.getPendingApprovalInvoices();
+            List<Invoice> suspicious = allPending.stream()
+                    .filter(inv -> {
+                        String risk = inv.getRiskLevel();
+                        return risk != null && !"GREEN".equals(risk);
+                    })
+                    .collect(Collectors.toList());
+            model.addAttribute("invoices", suspicious);
+            log.info("Found {} suspicious invoices", suspicious.size());
+        } else {
+            log.info("Suspicion detection is disabled - showing empty list");
             model.addAttribute("invoices", Collections.emptyList());
-            model.addAttribute("suspicionEnabled", false);
-            return "admin/invoices/suspicious";
+            model.addAttribute("info", "Suspicion detection is currently disabled.");
         }
+        return "admin/invoices/suspicious";
+    } catch (Exception e) {
+        log.error("Error loading suspicious invoices", e);
+        model.addAttribute("error", "Failed to load suspicious invoices: " + e.getMessage());
+        model.addAttribute("invoices", Collections.emptyList());
+        model.addAttribute("suspicionEnabled", false);
+        return "admin/invoices/suspicious";
     }
+}
 
     // ===== NOT FRAUDULENT =====
     @PostMapping("/{id}/not-fraudulent")

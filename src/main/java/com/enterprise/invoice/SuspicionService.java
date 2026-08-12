@@ -1,17 +1,19 @@
 package com.enterprise.invoice;
 
+import com.enterprise.events.SuspicionEnabledEvent;
 import com.enterprise.feature.FeatureFlagService;
 import com.enterprise.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import com.enterprise.events.SuspicionEnabledEvent;
-import org.springframework.context.event.EventListener;
 
 import java.util.List;
 
@@ -32,12 +34,6 @@ public class SuspicionService {
         this.featureFlagService = featureFlagService;
         this.invoiceService = invoiceService;
     }
-
-    @EventListener
-public void onSuspicionEnabled(SuspicionEnabledEvent event) {
-    log.info("📢 Received SuspicionEnabledEvent – re-evaluating all invoices");
-    reEvaluateAllInvoices();
-}
 
     public SuspicionResult evaluate(Invoice invoice) {
         if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
@@ -79,6 +75,7 @@ public void onSuspicionEnabled(SuspicionEnabledEvent event) {
         return new SuspicionResult("GREEN", "Normal invoice");
     }
 
+    // ===== RE-EVALUATE ALL INVOICES - CALLS INVOICE SERVICE =====
     public void reEvaluateAllInvoices() {
         // 👈 ADD THIS GUARD
         if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
@@ -86,6 +83,13 @@ public void onSuspicionEnabled(SuspicionEnabledEvent event) {
             return;
         }
         invoiceService.reEvaluateAllInvoicesForSuspicion();
+    }
+
+    // ===== EVENT LISTENER - RECEIVES SUSPICION ENABLED EVENT =====
+    @EventListener
+    public void onSuspicionEnabled(SuspicionEnabledEvent event) {
+        log.info("📢 Received SuspicionEnabledEvent – re-evaluating all invoices");
+        reEvaluateAllInvoices();
     }
 
     public static class SuspicionResult {

@@ -50,7 +50,6 @@ public class Invoice {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    // ===== WOOCOMMERCE FIELDS =====
     @Column(name = "woo_order_id")
     private Long wooOrderId;
 
@@ -63,12 +62,13 @@ public class Invoice {
     @Column(name = "order_key")
     private String orderKey;
 
-    // ===== OPTIMISTIC LOCKING =====
+    @Column(name = "xero_invoice_id")
+    private String xeroInvoiceId;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
 
-    // Constructors
     public Invoice() {}
 
     public Invoice(BigDecimal amount, String description, String customerEmail, Long merchantId) {
@@ -79,7 +79,7 @@ public class Invoice {
         this.status = "DRAFT";
     }
 
-    // Getters and setters
+    // ===== GETTERS AND SETTERS =====
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -119,10 +119,6 @@ public class Invoice {
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 
-    public Long getVersion() { return version; }
-    public void setVersion(Long version) { this.version = version; }
-
-    // WooCommerce getters/setters
     public Long getWooOrderId() { return wooOrderId; }
     public void setWooOrderId(Long wooOrderId) { this.wooOrderId = wooOrderId; }
 
@@ -134,4 +130,10 @@ public class Invoice {
 
     public String getOrderKey() { return orderKey; }
     public void setOrderKey(String orderKey) { this.orderKey = orderKey; }
+
+    public String getXeroInvoiceId() { return xeroInvoiceId; }
+    public void setXeroInvoiceId(String xeroInvoiceId) { this.xeroInvoiceId = xeroInvoiceId; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

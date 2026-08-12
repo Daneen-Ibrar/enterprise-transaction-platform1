@@ -7,6 +7,7 @@ import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
 import com.enterprise.tenant.TenantContext;
+import com.enterprise.xero.service.XeroInvoiceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,8 @@ import org.springframework.http.MediaType;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -44,6 +47,7 @@ public class InvoiceService {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final FeatureFlagService featureFlagService;
+    private final XeroInvoiceService xeroInvoiceService;
 
     public InvoiceService(InvoiceRepository invoiceRepository,
                           NotificationService notificationService,
@@ -53,7 +57,8 @@ public class InvoiceService {
                           AuditService auditService,
                           ObjectMapper objectMapper,
                           RestTemplate restTemplate,
-                          FeatureFlagService featureFlagService) {
+                          FeatureFlagService featureFlagService,
+                          XeroInvoiceService xeroInvoiceService) {
         this.invoiceRepository = invoiceRepository;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
@@ -63,10 +68,11 @@ public class InvoiceService {
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplate;
         this.featureFlagService = featureFlagService;
+        this.xeroInvoiceService = xeroInvoiceService;
     }
 
     // ===== PRIMARY CREATE INVOICE =====
-    @Transactional
+    @Transactional(noRollbackFor = Exception.class)
     public Invoice createInvoice(BigDecimal amount, String description, String customerEmail,
                                  Long merchantId, boolean requiresApproval, String currency,
                                  Long wooOrderId, String webhookUrl, String returnUrl,
@@ -162,6 +168,14 @@ public class InvoiceService {
             }
         }
 
+        // ===== SYNC TO XERO (ONLY IF NO APPROVAL REQUIRED) =====
+        // If invoice doesn't need approval, sync immediately
+        if (!needsApproval) {
+            syncToXeroIfConnected(invoice);
+        } else {
+            log.info("⏳ Invoice {} requires approval - will sync when approved", invoice.getId());
+        }
+
         log.info("✅ Invoice {} created successfully", invoice.getId());
         return invoice;
     }
@@ -193,13 +207,43 @@ public class InvoiceService {
         sendRejectionWebhook(invoice, reason);
     }
 
+    // ===== SYNC INVOICE TO XERO =====
+    private void syncToXeroIfConnected(Invoice invoice) {
+        try {
+            Long tenantId = invoice.getTenantId();
+            if (tenantId != null && xeroInvoiceService != null) {
+                // ✅ Only sync if invoice is APPROVED (not PENDING_APPROVAL)
+                if (!"APPROVED".equals(invoice.getStatus())) {
+                    log.debug("⏳ Invoice {} is not approved yet (status: {}), skipping Xero sync", 
+                            invoice.getId(), invoice.getStatus());
+                    return;
+                }
+                
+                // ✅ Check if already synced (has Xero ID)
+                if (invoice.getXeroInvoiceId() != null && !invoice.getXeroInvoiceId().isEmpty()) {
+                    log.debug("⏭️ Invoice {} already synced to Xero with ID: {}", 
+                            invoice.getId(), invoice.getXeroInvoiceId());
+                    return;
+                }
+                
+                String xeroId = xeroInvoiceService.syncInvoiceToXero(invoice);
+                if (xeroId != null) {
+                    log.info("✅ Invoice {} synced to Xero with ID: {}", invoice.getId(), xeroId);
+                }
+            }
+        } catch (Exception e) {
+            // Don't fail the transaction if Xero sync fails
+            log.warn("⚠️ Failed to sync invoice {} to Xero: {}", invoice.getId(), e.getMessage());
+        }
+    }
+
     // ===== APPROVE INVOICE =====
     @Retryable(
         value = {OptimisticLockingFailureException.class},
         maxAttempts = 3,
         backoff = @Backoff(delay = 100)
     )
-    @Transactional
+    @Transactional(noRollbackFor = Exception.class)
     public Invoice approveInvoice(Long invoiceId, Long adminId) {
         log.info("🔵 InvoiceService.approveInvoice() called - invoice: {}, admin: {}", invoiceId, adminId);
 
@@ -218,6 +262,7 @@ public class InvoiceService {
 
         log.info("   Approving invoice {}", invoiceId);
         invoice.setStatus("APPROVED");
+        invoice.setRequiresApproval(false);
         invoice.setUpdatedAt(LocalDateTime.now());
         Invoice afterEntity = invoiceRepository.save(invoice);
         Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
@@ -250,10 +295,13 @@ public class InvoiceService {
             );
         }
 
+        // ===== SYNC TO XERO (NOW THAT IT'S APPROVED) =====
+        syncToXeroIfConnected(afterEntity);
+
         // ===== SEND WEBHOOK ASYNCHRONOUSLY =====
         sendApprovalWebhookAsync(afterEntity);
 
-        log.info("✅ Invoice {} approved successfully", invoiceId);
+        log.info("✅ Invoice {} approved and synced to Xero", invoiceId);
         return afterEntity;
     }
 
@@ -263,7 +311,7 @@ public class InvoiceService {
         maxAttempts = 3,
         backoff = @Backoff(delay = 100)
     )
-    @Transactional
+    @Transactional(noRollbackFor = Exception.class)
     public Invoice rejectInvoice(Long invoiceId, Long adminId, String reason) {
         log.info("🔴 InvoiceService.rejectInvoice() called - invoice: {}, admin: {}, reason: {}", invoiceId, adminId, reason);
 
@@ -416,53 +464,65 @@ public class InvoiceService {
     }
 
     // ===== MARK AS PAID =====
-    @Transactional
-    public void markAsPaid(Long invoiceId, Long transactionId) {
-        log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
-        Invoice beforeEntity = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
-        Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
+  @Transactional(noRollbackFor = Exception.class)
+public void markAsPaid(Long invoiceId, Long transactionId) {
+    log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
+    
+    Invoice beforeEntity = invoiceRepository.findById(invoiceId)
+            .orElseThrow(() -> new RuntimeException("Invoice not found"));
+    Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
 
-        Invoice invoice = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
-        if (!"APPROVED".equals(invoice.getStatus())) {
-            log.warn("⚠️ Invoice {} is not approved (status: {})", invoiceId, invoice.getStatus());
-            throw new IllegalStateException("Invoice is not approved");
-        }
-        invoice.setStatus("PAID");
-        invoice.setUpdatedAt(LocalDateTime.now());
-        Invoice afterEntity = invoiceRepository.save(invoice);
-        Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
+    Invoice invoice = invoiceRepository.findById(invoiceId)
+            .orElseThrow(() -> new RuntimeException("Invoice not found"));
+    if (!"APPROVED".equals(invoice.getStatus())) {
+        log.warn("⚠️ Invoice {} is not approved (status: {})", invoiceId, invoice.getStatus());
+        throw new IllegalStateException("Invoice is not approved");
+    }
+    invoice.setStatus("PAID");
+    invoice.setUpdatedAt(LocalDateTime.now());
+    Invoice afterEntity = invoiceRepository.save(invoice);
+    Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
 
-        auditService.recordEvent(
-                "INVOICE_PAID",
-                invoice.getMerchantId(),
-                Map.of("invoiceId", invoiceId, "transactionId", transactionId),
-                "Invoice",
-                invoiceId,
-                before,
-                after
-        );
+    auditService.recordEvent(
+            "INVOICE_PAID",
+            invoice.getMerchantId(),
+            Map.of("invoiceId", invoiceId, "transactionId", transactionId),
+            "Invoice",
+            invoiceId,
+            before,
+            after
+    );
 
+    notificationService.createNotification(
+            invoice.getMerchantId(),
+            "INVOICE_PAID",
+            "Invoice Paid",
+            String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
+            "/transactions/" + transactionId
+    );
+    Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
+    if (customerId != null) {
         notificationService.createNotification(
-                invoice.getMerchantId(),
+                customerId,
                 "INVOICE_PAID",
                 "Invoice Paid",
-                String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
+                String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
                 "/transactions/" + transactionId
         );
-        Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
-        if (customerId != null) {
-            notificationService.createNotification(
-                    customerId,
-                    "INVOICE_PAID",
-                    "Invoice Paid",
-                    String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
-                    "/transactions/" + transactionId
-            );
-        }
     }
 
+    // ===== ✅ SYNC PAYMENT TO XERO =====
+    try {
+        String paymentId = xeroInvoiceService.syncPaymentToXero(invoice, transactionId);
+        if (paymentId != null) {
+            log.info("✅ Payment {} synced to Xero for invoice {}", paymentId, invoiceId);
+        } else {
+            log.warn("⚠️ Payment sync to Xero failed for invoice {}", invoiceId);
+        }
+    } catch (Exception e) {
+        log.warn("⚠️ Failed to sync payment to Xero for invoice {}: {}", invoiceId, e.getMessage());
+    }
+}
     public boolean isInvoicePaid(Long invoiceId) {
         return invoiceRepository.findById(invoiceId)
                 .map(inv -> "PAID".equals(inv.getStatus()))
@@ -471,7 +531,7 @@ public class InvoiceService {
 
     // ===== RE-EVALUATION =====
     @Transactional
-    public void reEvaluateAllInvoices() {
+    public void reEvaluateAllInvoicesForApproval() {
         log.info("🔄 Re-evaluating all non-paid invoices for approval rules");
         List<Invoice> invoices = invoiceRepository.findByStatusIn(List.of("APPROVED", "PENDING_APPROVAL"));
         int updated = 0;
@@ -524,6 +584,13 @@ public class InvoiceService {
         log.info("✅ Re-evaluation completed: {} invoices updated", updated);
     }
 
+    // ===== BACKWARD COMPATIBILITY - calls suspicion re-evaluation =====
+    @Transactional
+    public void reEvaluateAllInvoices() {
+        reEvaluateAllInvoicesForSuspicion();
+    }
+
+    // ===== RE-EVALUATE ALL INVOICES FOR SUSPICION =====
     @Transactional
     public void reEvaluateAllInvoicesForSuspicion() {
         if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
@@ -532,23 +599,67 @@ public class InvoiceService {
         }
 
         log.info("🔄 Re-evaluating all invoices for suspicion");
-        List<Invoice> allInvoices = invoiceRepository.findAll();
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isSuperAdmin = false;
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            isSuperAdmin = auth.getAuthorities().stream()
+                    .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        }
+
+        List<Invoice> allInvoices;
+        if (isSuperAdmin) {
+            allInvoices = invoiceRepository.findAllInvoicesForReevaluation();
+            log.info("Super Admin re-evaluating {} invoices across all tenants", allInvoices.size());
+        } else {
+            Long tenantId = TenantContext.getRequiredTenantId();
+            allInvoices = invoiceRepository.findAllByTenantIdForReevaluation(tenantId);
+            log.info("User re-evaluating {} invoices for tenant {}", allInvoices.size(), tenantId);
+        }
+
         int updated = 0;
+        int cleared = 0;
+        int movedToSuspicious = 0;
+        
         for (Invoice invoice : allInvoices) {
             if ("PAID".equals(invoice.getStatus()) || "REJECTED".equals(invoice.getStatus())) {
                 continue;
             }
+            
             SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
             String newRisk = result.getRiskLevel();
-            if (!newRisk.equals(invoice.getRiskLevel())) {
-                invoice.setRiskLevel(newRisk);
-                invoice.setSuspicionReason(result.getReason());
-                invoice.setUpdatedAt(LocalDateTime.now());
-                invoiceRepository.save(invoice);
+            String newReason = result.getReason();
+            
+            String oldRisk = invoice.getRiskLevel();
+            
+            if (!newRisk.equals(oldRisk) || !newReason.equals(invoice.getSuspicionReason())) {
+                invoiceRepository.updateRiskLevel(invoice.getId(), newRisk, newReason);
+                
+                if ("GREEN".equals(newRisk)) {
+                    if (!approvalService.evaluate(invoice)) {
+                        invoice.setRequiresApproval(false);
+                        invoice.setStatus("APPROVED");
+                        invoiceRepository.save(invoice);
+                        cleared++;
+                        log.info("✅ Cleared suspicion for invoice {}: {} -> {}", invoice.getId(), oldRisk, newRisk);
+                    } else {
+                        invoice.setStatus("PENDING_APPROVAL");
+                        invoiceRepository.save(invoice);
+                        log.info("✅ Cleared suspicion for invoice {}: {} -> {}, but needs approval", invoice.getId(), oldRisk, newRisk);
+                    }
+                } else {
+                    invoice.setRequiresApproval(true);
+                    invoice.setStatus("PENDING_APPROVAL");
+                    invoiceRepository.save(invoice);
+                    movedToSuspicious++;
+                    log.info("🚨 Invoice {} marked as suspicious: {} -> {}", invoice.getId(), oldRisk, newRisk);
+                }
                 updated++;
             }
         }
-        log.info("✅ Re-evaluation for suspicion completed: {} invoices risk levels changed", updated);
+        
+        log.info("✅ Re-evaluation for suspicion completed: {} updated, {} cleared, {} moved to suspicious", 
+                updated, cleared, movedToSuspicious);
     }
 
     @EventListener
