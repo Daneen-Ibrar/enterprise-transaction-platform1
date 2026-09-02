@@ -2,6 +2,7 @@ package com.enterprise.feature;
 
 import com.enterprise.events.SuspicionEnabledEvent;
 import com.enterprise.tenant.TenantContext;
+import com.enterprise.xero.service.XeroOAuthService;  // ✅ ADD THIS IMPORT
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -19,11 +20,14 @@ public class FeatureFlagService {
     private static final Logger log = LoggerFactory.getLogger(FeatureFlagService.class);
     private final FeatureFlagRepository repository;
     private final ApplicationEventPublisher eventPublisher;
+    private final XeroOAuthService xeroOAuthService;  // ✅ ADD THIS
 
     public FeatureFlagService(FeatureFlagRepository repository,
-                              ApplicationEventPublisher eventPublisher) {
+                              ApplicationEventPublisher eventPublisher,
+                              XeroOAuthService xeroOAuthService) {  // ✅ ADD TO CONSTRUCTOR
         this.repository = repository;
         this.eventPublisher = eventPublisher;
+        this.xeroOAuthService = xeroOAuthService;
     }
 
     @Cacheable(value = "featureFlags", key = "#name + '_' + #tenantId")
@@ -33,6 +37,25 @@ public class FeatureFlagService {
             log.warn("No tenant context – defaulting to false for flag: {}", name);
             return false;
         }
+
+        // ✅ If checking XERO_AUTO_SYNC, verify Xero is actually connected
+        if ("XERO_AUTO_SYNC".equals(name)) {
+            try {
+                boolean isConnected = xeroOAuthService.isConnected(tenantId);
+                if (!isConnected) {
+                    log.debug("🔌 Xero not connected for tenant {}, returning false for XERO_AUTO_SYNC", tenantId);
+                    return false;
+                }
+                // Xero is connected, check the flag
+                return repository.findByNameAndTenantId(name, tenantId)
+                        .map(FeatureFlag::isEnabled)
+                        .orElse(false);
+            } catch (Exception e) {
+                log.warn("⚠️ Could not check Xero connection for tenant {}: {}", tenantId, e.getMessage());
+                return false;
+            }
+        }
+
         log.debug("Checking feature flag: {} for tenant {}", name, tenantId);
         return repository.findByNameAndTenantId(name, tenantId)
                 .map(FeatureFlag::isEnabled)

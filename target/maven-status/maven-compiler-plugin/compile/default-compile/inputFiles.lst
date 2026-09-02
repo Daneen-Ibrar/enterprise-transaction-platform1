@@ -3,6 +3,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/aop/TenantFilterDefinition.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminActivityController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminApiKeyController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminApiKeyMonitorController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminApprovalController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminAuditController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminBulkController.java
@@ -21,6 +22,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminRootController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminRuleAuditController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminSuspicionController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminTaxController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminTenantController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminUserController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AdminViewController.java
@@ -153,6 +155,10 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/NotificationService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/RealEmailService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/notification/StubEmailService.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ratelimit/RateLimitConfig.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ratelimit/RateLimitConfigRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ratelimit/RateLimitViolation.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/ratelimit/RateLimitViolationRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/reconciliation/ReconciliationDetail.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/reconciliation/ReconciliationDetailRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/reconciliation/ReconciliationRecord.java
@@ -215,6 +221,10 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/service/BulkJobService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/simulator/SimulatorService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/simulator/SimulatorToken.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/TaxRule.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/TaxRuleRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/TaxService.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/VatLayerService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tenant/Tenant.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tenant/TenantContext.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tenant/TenantRepository.java
@@ -237,6 +247,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/webhook/WebhookService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/xero/config/XeroConfig.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/xero/entity/XeroToken.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/xero/initializer/XeroStartupCheck.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/xero/repository/XeroTokenRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/xero/service/XeroInvoiceService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/xero/service/XeroOAuthService.java

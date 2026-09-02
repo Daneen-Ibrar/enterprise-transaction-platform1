@@ -3,68 +3,131 @@
 <head>
     <title>Recurring Invoices</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+        .stat-card { background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; min-width: 150px; text-align: center; }
+        .stat-card .number { font-size: 24px; font-weight: bold; color: #2d7a3a; }
+        .stat-card .label { color: #666; font-size: 14px; }
+        .nav-tabs { display: flex; gap: 5px; margin: 20px 0; border-bottom: 2px solid #ddd; flex-wrap: wrap; }
+        .nav-tabs a { padding: 10px 20px; text-decoration: none; color: #555; border-radius: 4px 4px 0 0; }
+        .nav-tabs a.active { background: #2d7a3a; color: white; }
+        .nav-tabs a:hover { background: #e9ecef; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin: 20px 0; }
         table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f2f2f2; }
-        .badge { padding: 2px 8px; border-radius: 12px; color: white; }
+        .badge { padding: 4px 12px; border-radius: 12px; color: white; font-size: 12px; display: inline-block; }
         .badge-active { background: #2d7a3a; }
         .badge-inactive { background: #c0392b; }
-        .btn { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .badge-trial { background: #f39c12; }
+        .badge-cancelled { background: #95a5a6; }
+        .btn { padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 12px; }
         .btn-edit { background: #3498db; color: white; }
         .btn-toggle { background: #f39c12; color: white; }
         .btn-delete { background: #c0392b; color: white; }
         .btn-create { background: #2d7a3a; color: white; padding: 8px 16px; }
+        .btn-primary { background: #2d7a3a; color: white; padding: 8px 16px; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .btn-cancel { background: #c0392b; color: white; }
+        .btn-upgrade { background: #2980b9; color: white; }
+        .flash-success { background: #d4edda; padding: 12px; border-radius: 4px; color: #155724; margin: 10px 0; }
+        .flash-error { background: #f8d7da; padding: 12px; border-radius: 4px; color: #721c24; margin: 10px 0; }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .back-link { color: #007bff; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <h1>📆 Recurring Invoices</h1>
-    <a href="/dashboard">← Back to Dashboard</a>
-
-    <div style="margin: 15px 0;">
-        <a href="/merchant/recurring/create" class="btn btn-create">+ New Recurring Schedule</a>
+<div class="container">
+    <div class="header">
+        <h1>📆 Recurring Invoices</h1>
+        <a href="/dashboard" class="back-link">← Back to Dashboard</a>
     </div>
 
-    <div th:if="${success}" style="background: #d4edda; padding: 10px; border-radius: 4px; margin: 10px 0; color: #155724;">
-        <span th:text="${success}">Success</span>
+    <!-- Flash Messages -->
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number" th:text="${stats.activeSubscriptions}">0</div>
+            <div class="label">Active Subscriptions</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" th:text="${stats.totalSubscriptions}">0</div>
+            <div class="label">Total Subscriptions</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" th:text="${#numbers.formatDecimal(stats.monthlyRevenue, 0, 'COMMA', 2, 'POINT')}">0.00</div>
+            <div class="label">Monthly Revenue (GBP)</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" th:text="${#numbers.formatDecimal(stats.annualRevenue, 0, 'COMMA', 2, 'POINT')}">0.00</div>
+            <div class="label">Annual Revenue (GBP)</div>
+        </div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Customer</th>
-                <th>Amount</th>
-                <th>Frequency</th>
-                <th>Next Run</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="s : ${schedules}">
-                <td th:text="${s.id}">1</td>
-                <td th:text="${s.customerEmail}">customer@example.com</td>
-                <td th:text="${currencyHelper.getFormattedAmount(s.amount, s.currency)}">£ 100.00</td>
-                <td th:text="${s.frequency}">MONTHLY</td>
-                <td th:text="${s.nextRunDate}">2026-01-01</td>
-                <td>
-                    <span class="badge" th:classappend="${s.active ? 'badge-active' : 'badge-inactive'}"
-                          th:text="${s.active ? 'Active' : 'Inactive'}">Active</span>
-                </td>
-                <td>
-                    <a th:href="@{/merchant/recurring/{id}/edit(id=${s.id})}" class="btn btn-edit">Edit</a>
-                    <form method="post" th:action="@{/merchant/recurring/{id}/toggle(id=${s.id})}" style="display:inline;">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                        <button type="submit" class="btn btn-toggle">Toggle</button>
-                    </form>
-                    <form method="post" th:action="@{/merchant/recurring/{id}/delete(id=${s.id})}" style="display:inline;">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                        <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this schedule?')">Delete</button>
-                    </form>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+        <a href="/merchant/recurring" class="active">📋 Schedules</a>
+        <a href="/merchant/recurring/subscriptions">👥 Subscriptions</a>
+        <a href="/merchant/recurring/plans">📊 Plans</a>
+    </div>
+
+    <!-- Schedule List -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Recurring Schedules</h3>
+            <a href="/merchant/recurring/create" class="btn btn-create">+ New Recurring Schedule</a>
+        </div>
+
+        <div th:if="${schedules != null and !schedules.isEmpty()}">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Frequency</th>
+                        <th>Next Run</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="s : ${schedules}">
+                        <td th:text="${s.id}">1</td>
+                        <td th:text="${s.customerEmail}">customer@example.com</td>
+                        <td th:text="${currencyHelper.getFormattedAmount(s.amount, s.currency)}">£ 100.00</td>
+                        <td th:text="${s.frequency}">MONTHLY</td>
+                        <td th:text="${s.nextRunDate}">2026-01-01</td>
+                        <td>
+                            <span class="badge" th:classappend="${s.active ? 'badge-active' : 'badge-inactive'}"
+                                  th:text="${s.active ? 'Active' : 'Inactive'}">Active</span>
+                        </td>
+                        <td>
+                            <a th:href="@{/merchant/recurring/{id}/edit(id=${s.id})}" class="btn btn-edit">Edit</a>
+                            <form method="post" th:action="@{/merchant/recurring/{id}/toggle(id=${s.id})}" style="display:inline;">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <button type="submit" class="btn btn-toggle">Toggle</button>
+                            </form>
+                            <form method="post" th:action="@{/merchant/recurring/{id}/delete(id=${s.id})}" style="display:inline;">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this schedule?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:unless="${schedules != null and !schedules.isEmpty()}" class="empty">
+            <p>No recurring schedules found.</p>
+            <a href="/merchant/recurring/create" class="btn btn-create">Create your first schedule</a>
+        </div>
+    </div>
+</div>
 </body>
 </html>

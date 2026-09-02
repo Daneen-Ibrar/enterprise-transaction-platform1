@@ -43,6 +43,41 @@
         }
         .invoice-summary p { margin: 4px 0; font-size: 15px; }
         .invoice-summary .amount { font-size: 22px; font-weight: bold; color: #2d7a3a; }
+        .tax-breakdown {
+            background: #f0f4f8;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin: 10px 0 15px 0;
+            border: 1px solid #e2e8f0;
+        }
+        .tax-breakdown .tax-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            padding: 3px 0;
+            color: #444;
+        }
+        .tax-breakdown .tax-total {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 8px 0 0 0;
+            border-top: 2px solid #d0d8e0;
+            margin-top: 5px;
+            color: #1a1a2e;
+        }
+        .tax-breakdown .tax-label { color: #555; }
+        .tax-breakdown .tax-value { font-weight: 600; }
+        .tax-breakdown .tax-name-badge {
+            display: inline-block;
+            background: #2d7a3a;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
         .card-field { margin-bottom: 18px; }
         .card-field label {
             display: block;
@@ -143,7 +178,35 @@
         <p><strong>Invoice #<span th:text="${invoice.id}">1</span></strong></p>
         <p>Merchant: <span th:text="${invoice.merchantId}">2</span></p>
         <p>Description: <span th:text="${invoice.description}">Test</span></p>
-        <p class="amount">Total: <span th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£ 100.00</span></p>
+
+        <!-- ===== TAX BREAKDOWN ===== -->
+        <div th:if="${invoice.taxAmount != null and invoice.taxAmount > 0}" class="tax-breakdown">
+            <div class="tax-row">
+                <span class="tax-label">Subtotal</span>
+                <span class="tax-value" th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£100.00</span>
+            </div>
+            <div class="tax-row">
+                <span class="tax-label">
+                    Tax (<span th:text="${invoice.taxName}">VAT</span> 
+                    <span th:text="${invoice.taxRate}">20</span>%)
+                    <span class="tax-name-badge" th:text="${invoice.taxName}">VAT</span>
+                </span>
+                <span class="tax-value" th:text="${currencyHelper.getFormattedAmount(invoice.taxAmount, invoice.currency)}">£20.00</span>
+            </div>
+            <div class="tax-total">
+                <span>Total (with tax)</span>
+                <span th:text="${currencyHelper.getFormattedAmount(invoice.totalWithTax, invoice.currency)}">£120.00</span>
+            </div>
+            <div th:if="${invoice.customerCountry != null}" style="font-size: 11px; color: #888; text-align: right; margin-top: 5px;">
+                Country: <span th:text="${invoice.customerCountry}">GB</span>
+                <span th:if="${invoice.isB2B}" style="margin-left: 8px;">🏢 B2B</span>
+            </div>
+        </div>
+
+        <!-- ===== NO TAX ===== -->
+        <div th:if="${invoice.taxAmount == null or invoice.taxAmount == 0}" class="amount">
+            Total: <span th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£ 100.00</span>
+        </div>
     </div>
 
     <form id="paymentForm" method="post" th:action="@{/pay/{id}(id=${invoice.id})}">
@@ -172,7 +235,13 @@
         <div class="card-brand">Accepted: Visa · Mastercard · Amex</div>
 
         <button type="submit" class="btn-pay" id="payBtn">
-            <span id="btnText">Pay <span th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£ 100.00</span></span>
+            <span id="btnText">
+                Pay 
+                <span th:if="${invoice.totalWithTax != null and invoice.totalWithTax > 0}" 
+                      th:text="${currencyHelper.getFormattedAmount(invoice.totalWithTax, invoice.currency)}">£120.00</span>
+                <span th:unless="${invoice.totalWithTax != null and invoice.totalWithTax > 0}" 
+                      th:text="${currencyHelper.getFormattedAmount(invoice.amount, invoice.currency)}">£100.00</span>
+            </span>
             <span class="spinner" id="spinner"></span>
         </button>
     </form>

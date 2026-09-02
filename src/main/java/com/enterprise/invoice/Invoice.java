@@ -65,6 +65,27 @@ public class Invoice {
     @Column(name = "xero_invoice_id")
     private String xeroInvoiceId;
 
+    // ============================================================
+    // TAX FIELDS - ADD THESE
+    // ============================================================
+    @Column(name = "tax_amount", precision = 19, scale = 2)
+    private BigDecimal taxAmount;
+
+    @Column(name = "tax_rate", precision = 10, scale = 4)
+    private BigDecimal taxRate;
+
+    @Column(name = "tax_name", length = 50)
+    private String taxName;
+
+    @Column(name = "total_with_tax", precision = 19, scale = 2)
+    private BigDecimal totalWithTax;
+
+    @Column(name = "customer_country", length = 2)
+    private String customerCountry;
+
+    @Column(name = "is_b2b")
+    private boolean isB2B = false;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
@@ -136,4 +157,23 @@ public class Invoice {
 
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
+
+    // ===== TAX GETTERS AND SETTERS =====
+    public BigDecimal getTaxAmount() { return taxAmount; }
+    public void setTaxAmount(BigDecimal taxAmount) { this.taxAmount = taxAmount; }
+
+    public BigDecimal getTaxRate() { return taxRate; }
+    public void setTaxRate(BigDecimal taxRate) { this.taxRate = taxRate; }
+
+    public String getTaxName() { return taxName; }
+    public void setTaxName(String taxName) { this.taxName = taxName; }
+
+    public BigDecimal getTotalWithTax() { return totalWithTax; }
+    public void setTotalWithTax(BigDecimal totalWithTax) { this.totalWithTax = totalWithTax; }
+
+    public String getCustomerCountry() { return customerCountry; }
+    public void setCustomerCountry(String customerCountry) { this.customerCountry = customerCountry; }
+
+    public boolean isB2B() { return isB2B; }
+    public void setB2B(boolean b2B) { isB2B = b2B; }
 }

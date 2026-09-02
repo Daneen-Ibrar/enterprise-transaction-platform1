@@ -38,6 +38,7 @@
 
     <dependencyManagement>
         <dependencies>
+
             <!-- Force docker-java versions -->
             <dependency>
                 <groupId>com.github.docker-java</groupId>

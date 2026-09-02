@@ -3,9 +3,11 @@ package com.enterprise.reporting;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "generated_report")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class GeneratedReport {
 
     @Id
@@ -27,9 +29,10 @@ public class GeneratedReport {
     @Column(name = "generated_at", nullable = false)
     private LocalDateTime generatedAt = LocalDateTime.now();
 
-    // ✅ Remove @Lob – just use columnDefinition
-    @Column(name = "content", columnDefinition = "BYTEA", nullable = false)
+    // ✅ Option 1: Keep for fallback
+    @Column(name = "content", columnDefinition = "BYTEA")
     private byte[] content;
+
 
     @Column(name = "content_type", nullable = false)
     private String contentType;
@@ -37,8 +40,9 @@ public class GeneratedReport {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    // Getters and setters (unchanged)
-    // ...
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version = 0L;
 
     // Getters and setters
     public Long getId() { return id; }
@@ -67,4 +71,7 @@ public class GeneratedReport {
 
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>API Key Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .stats { display: flex; gap: 20px; margin: 20px 0; }
+        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; text-align: center; }
+        .stat-card .number { font-size: 28px; font-weight: bold; }
+        .stat-card .label { color: #666; font-size: 14px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin: 20px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; display: inline-block; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 12px; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 11px; }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .back-link { color: #007bff; text-decoration: none; margin-bottom: 20px; display: inline-block; }
+        .back-link:hover { text-decoration: underline; }
+        .key-prefix { font-family: monospace; background: #f5f5f5; padding: 2px 8px; border-radius: 4px; }
+        .violation-count { font-weight: bold; }
+        .no-violations { color: #28a745; }
+        .has-violations { color: #dc3545; }
+        .last-used { font-size: 12px; color: #888; }
+        .config-badge { font-size: 11px; padding: 2px 10px; border-radius: 12px; }
+        .config-yes { background: #d4edda; color: #155724; }
+        .config-no { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔑 API Key Monitor</h1>
+    <a href="/admin/api-keys" class="back-link">← Back to API Keys</a>
+    <a href="/admin/rate-limits" class="back-link" style="margin-left: 15px;">← Rate Limit Dashboard</a>
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number" th:text="${totalKeys}">0</div>
+            <div class="label">📊 Total API Keys</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" th:text="${keysWithConfigs}">0</div>
+            <div class="label">⚙️ With Rate Limits</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" th:text="${keysWithoutConfigs}">0</div>
+            <div class="label">⚠️ Without Rate Limits</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" th:text="${totalViolations}">0</div>
+            <div class="label">🚨 Total Violations</div>
+        </div>
+    </div>
+
+    <!-- API Key Status Table -->
+    <div class="card">
+        <h3>📋 API Key Status</h3>
+        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+            Monitor rate limit usage and violations per API key.
+            <a href="/admin/rate-limits/create" style="color: #007bff;">Add rate limit config →</a>
+        </p>
+
+        <div th:if="${keyStatuses != null and !keyStatuses.isEmpty()}">
+            <table>
+                <thead>
+                    <tr>
+                        <th>API Key</th>
+                        <th>Status</th>
+                        <th>Violations</th>
+                        <th>Rate Limit Config</th>
+                        <th>Last Used</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="status : ${keyStatuses}">
+                        <td>
+                            <span class="key-prefix" th:text="${status.apiKey.keyPrefix}">ep_1234</span>
+                            <span th:if="${!status.active}" class="badge badge-danger" style="font-size: 10px;">Inactive</span>
+                        </td>
+                        <td>
+                            <span class="badge" 
+                                  th:classappend="'badge-' + ${status.statusBadge}"
+                                  th:text="${status.statusText}">Healthy</span>
+                        </td>
+                        <td>
+                            <span th:if="${status.violationCount > 0}" 
+                                  class="violation-count has-violations" 
+                                  th:text="${status.violationCount}">0</span>
+                            <span th:unless="${status.violationCount > 0}" 
+                                  class="no-violations">✅ 0</span>
+                            <span th:if="${status.violationCount > 0}" style="font-size: 12px; color: #888;">
+                                (last 7 days)
+                            </span>
+                        </td>
+                        <td>
+                            <span th:if="${status.hasConfig}" class="config-badge config-yes">✅ Configured</span>
+                            <span th:unless="${status.hasConfig}" class="config-badge config-no">❌ Not configured</span>
+                            <span th:if="${status.hasConfig}" style="font-size: 11px; color: #666; display: block;">
+                                Limit: <span th:text="${status.paymentLimit}"/> / <span th:text="${status.readLimit}"/>
+                            </span>
+                        </td>
+                        <td>
+                            <span th:if="${status.lastUsed != null}" class="last-used" 
+                                  th:text="${#temporals.format(status.lastUsed, 'yyyy-MM-dd HH:mm')}">-</span>
+                            <span th:unless="${status.lastUsed != null}" style="color: #888; font-size: 12px;">Never used</span>
+                        </td>
+                        <td>
+                           <a th:href="'/admin/api-keys/monitor/' + ${status.apiKey.keyPrefix}" 
+   class="btn btn-primary btn-sm" style="background: #6c5ce7;">📊 Details</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:unless="${keyStatuses != null and !keyStatuses.isEmpty()}" class="empty">
+            <p>No API keys found. Create an API key to start monitoring.</p>
+            <a href="/admin/api-keys" class="btn btn-primary">➕ Create API Key</a>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card" style="background: #f8f9fa;">
+        <h4>📖 Legend</h4>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px;">
+            <div><span class="badge badge-success">✅ Healthy</span> No violations</div>
+            <div><span class="badge badge-warning">⚡ Moderate</span> 5-10 violations</div>
+            <div><span class="badge badge-danger">⚠️ High</span> 10+ violations</div>
+            <div><span class="badge badge-danger">Inactive</span> API key is disabled</div>
+            <div><span class="config-badge config-yes">✅ Configured</span> Rate limits set</div>
+            <div><span class="config-badge config-no">❌ Not configured</span> Using defaults</div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

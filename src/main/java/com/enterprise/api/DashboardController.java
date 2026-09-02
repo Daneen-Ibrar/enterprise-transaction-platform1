@@ -8,9 +8,12 @@ import com.enterprise.invoice.Invoice;
 import com.enterprise.invoice.InvoiceRepository;
 import com.enterprise.invoice.InvoiceService;
 import com.enterprise.notification.NotificationService;
+import com.enterprise.ratelimit.RateLimitConfig;
+import com.enterprise.ratelimit.RateLimitViolation;
 import com.enterprise.reconciliation.ReconciliationRecordRepository;
 import com.enterprise.reliability.DlqEntryRepository;
 import com.enterprise.reporting.ReportingService;
+import com.enterprise.security.RateLimitService;
 import com.enterprise.tenant.Tenant;
 import com.enterprise.tenant.TenantRepository;
 import com.enterprise.transaction.Transaction;
@@ -28,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -48,6 +52,7 @@ public class DashboardController {
     private final InvoiceRepository invoiceRepository;
     private final TenantRepository tenantRepository;
     private final ExchangeRateService exchangeRateService;
+    private final RateLimitService rateLimitService;  // ✅ ADD THIS
 
     public DashboardController(TransactionRepository transactionRepository,
                                AuditRepository auditRepository,
@@ -59,7 +64,8 @@ public class DashboardController {
                                ReportingService reportingService,
                                InvoiceRepository invoiceRepository,
                                TenantRepository tenantRepository,
-                               ExchangeRateService exchangeRateService) {
+                               ExchangeRateService exchangeRateService,
+                               RateLimitService rateLimitService) {  // ✅ ADD TO CONSTRUCTOR
         this.transactionRepository = transactionRepository;
         this.auditRepository = auditRepository;
         this.reconciliationRecordRepository = reconciliationRecordRepository;
@@ -71,6 +77,7 @@ public class DashboardController {
         this.invoiceRepository = invoiceRepository;
         this.tenantRepository = tenantRepository;
         this.exchangeRateService = exchangeRateService;
+        this.rateLimitService = rateLimitService;  // ✅ ADD THIS
     }
 
     @GetMapping("/dashboard")
@@ -129,6 +136,26 @@ public class DashboardController {
                     .filter(inv -> inv.getRiskLevel() != null && !"GREEN".equals(inv.getRiskLevel()))
                     .count();
             model.addAttribute("suspiciousCount", suspiciousCount);
+        }
+
+        // ============================================================
+        // ✅ RATE LIMIT STATS (Super Admin + Merchant Admin only)
+        // ============================================================
+        if (isSuperAdmin || isMerchantAdmin) {
+            try {
+                List<RateLimitConfig> configs = rateLimitService.getAllConfigsForTenant(tenantId);
+                long violations = rateLimitService.getViolationCountSince(tenantId, LocalDateTime.now().minusDays(7));
+                List<RateLimitViolation> recentViolations = rateLimitService.getViolationsForTenant(tenantId, 5);
+                
+                model.addAttribute("totalRateLimitConfigs", configs != null ? configs.size() : 0);
+                model.addAttribute("recentRateLimitViolations", violations);
+                model.addAttribute("rateLimitRecentViolations", recentViolations);
+            } catch (Exception e) {
+                log.warn("Could not load rate limit stats: {}", e.getMessage());
+                model.addAttribute("totalRateLimitConfigs", 0);
+                model.addAttribute("recentRateLimitViolations", 0);
+                model.addAttribute("rateLimitRecentViolations", Collections.emptyList());
+            }
         }
 
         // ===== MERCHANT & MERCHANT_ADMIN SPECIFIC DATA =====
