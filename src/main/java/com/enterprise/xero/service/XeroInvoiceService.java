@@ -39,92 +39,99 @@ public class XeroInvoiceService {
         this.defaultClient = new ApiClient();
     }
 
-    // ===== SYNC INVOICE TO XERO =====
-    @Transactional
-    public String syncInvoiceToXero(Invoice invoice) throws Exception {
-        if (invoice.getXeroInvoiceId() != null && 
-            !invoice.getXeroInvoiceId().isEmpty() && 
-            !FAKE_XERO_ID.equals(invoice.getXeroInvoiceId())) {
-            log.info("⏭️ Invoice {} already synced to Xero with ID: {}", 
-                    invoice.getId(), invoice.getXeroInvoiceId());
-            return invoice.getXeroInvoiceId();
-        }
-
-        if (FAKE_XERO_ID.equals(invoice.getXeroInvoiceId())) {
-            log.warn("⚠️ Invoice {} has fake Xero ID, clearing", invoice.getId());
-            invoice.setXeroInvoiceId(null);
-            invoice.setWebhookUrl(null);
-            invoiceRepository.save(invoice);
-        }
-
-        Long tenantId = TenantContext.getRequiredTenantId();
-        XeroToken token = xeroOAuthService.getValidToken(tenantId);
-
-        if (token == null) {
-            log.warn("No Xero token found for tenant: {}", tenantId);
-            return null;
-        }
-
-        AccountingApi accountingApi = AccountingApi.getInstance(defaultClient);
-
-        com.xero.models.accounting.Invoice xeroInvoice = new com.xero.models.accounting.Invoice();
-        xeroInvoice.setType(com.xero.models.accounting.Invoice.TypeEnum.ACCREC);
-        
+    // ============================================================
+    // ✅ SYNC INVOICE TO XERO - Returns null instead of throwing
+    // ============================================================
+    @Transactional(noRollbackFor = Exception.class)
+    public String syncInvoiceToXero(Invoice invoice) {
         try {
-            xeroInvoice.setStatus(com.xero.models.accounting.Invoice.StatusEnum.AUTHORISED);
-        } catch (Exception e) {
-            log.warn("Could not set status, using Xero default");
-        }
+            if (invoice.getXeroInvoiceId() != null && 
+                !invoice.getXeroInvoiceId().isEmpty() && 
+                !FAKE_XERO_ID.equals(invoice.getXeroInvoiceId())) {
+                log.info("⏭️ Invoice {} already synced to Xero with ID: {}", 
+                        invoice.getId(), invoice.getXeroInvoiceId());
+                return invoice.getXeroInvoiceId();
+            }
 
-        Contact contact = new Contact();
-        String contactName = invoice.getCustomerEmail();
-        if (contactName == null || contactName.isEmpty()) {
-            contactName = "Unknown Customer";
-        }
-        contact.setName(contactName);
-        xeroInvoice.setContact(contact);
+            if (FAKE_XERO_ID.equals(invoice.getXeroInvoiceId())) {
+                log.warn("⚠️ Invoice {} has fake Xero ID, clearing", invoice.getId());
+                invoice.setXeroInvoiceId(null);
+                invoice.setWebhookUrl(null);
+                invoiceRepository.save(invoice);
+            }
 
-        String todayXeroDate = formatToXeroDate(LocalDate.now());
-        String dueXeroDate = formatToXeroDate(LocalDate.now().plusDays(30));
-        
-        xeroInvoice.setDate(todayXeroDate);
-        xeroInvoice.setDueDate(dueXeroDate);
-        xeroInvoice.setReference("INV-" + invoice.getId());
+            Long tenantId = invoice.getTenantId();
+            if (tenantId == null) {
+                tenantId = TenantContext.getRequiredTenantId();
+            }
 
-        try {
-            xeroInvoice.setCurrencyCode(
-                com.xero.models.accounting.CurrencyCode.fromValue(invoice.getCurrency())
-            );
-        } catch (Exception e) {
-            log.warn("Invalid currency code: {}, defaulting to GBP", invoice.getCurrency());
-            xeroInvoice.setCurrencyCode(com.xero.models.accounting.CurrencyCode.GBP);
-        }
+            // ✅ Get token - returns null if not connected
+            XeroToken token = xeroOAuthService.getValidToken(tenantId);
 
-        LineItem lineItem = new LineItem();
-        String description = invoice.getDescription();
-        if (description == null || description.isEmpty()) {
-            description = "Invoice #" + invoice.getId();
-        }
-        lineItem.setDescription(description);
-        lineItem.setQuantity(1.0);
-        
-        double amount = invoice.getAmount().doubleValue();
-        if (amount <= 0) {
-            log.warn("⚠️ Invoice {} has invalid amount: {}, setting to 1.00", invoice.getId(), amount);
-            amount = 1.00;
-        }
-        lineItem.setUnitAmount(amount);
-        lineItem.setAccountCode("200");
-        xeroInvoice.setLineItems(Collections.singletonList(lineItem));
+            if (token == null) {
+                log.info("⏭️ No Xero token found for tenant: {}, skipping sync", tenantId);
+                return null;
+            }
 
-        Invoices invoicesWrapper = new Invoices();
-        invoicesWrapper.setInvoices(Collections.singletonList(xeroInvoice));
+            AccountingApi accountingApi = AccountingApi.getInstance(defaultClient);
 
-        String idempotencyKey = "inv-" + invoice.getId() + "-" + UUID.randomUUID();
+            com.xero.models.accounting.Invoice xeroInvoice = new com.xero.models.accounting.Invoice();
+            xeroInvoice.setType(com.xero.models.accounting.Invoice.TypeEnum.ACCREC);
+            
+            try {
+                xeroInvoice.setStatus(com.xero.models.accounting.Invoice.StatusEnum.AUTHORISED);
+            } catch (Exception e) {
+                log.warn("Could not set status, using Xero default");
+            }
 
-        try {
-            log.info("📤 Syncing invoice {} to Xero: Reference={}, Amount={}", 
-                    invoice.getId(), xeroInvoice.getReference(), invoice.getAmount());
+            Contact contact = new Contact();
+            String contactName = invoice.getCustomerEmail();
+            if (contactName == null || contactName.isEmpty()) {
+                contactName = "Unknown Customer";
+            }
+            contact.setName(contactName);
+            xeroInvoice.setContact(contact);
+
+            String todayXeroDate = formatToXeroDate(LocalDate.now());
+            String dueXeroDate = formatToXeroDate(LocalDate.now().plusDays(30));
+            
+            xeroInvoice.setDate(todayXeroDate);
+            xeroInvoice.setDueDate(dueXeroDate);
+            xeroInvoice.setReference("INV-" + invoice.getId());
+
+            try {
+                xeroInvoice.setCurrencyCode(
+                    com.xero.models.accounting.CurrencyCode.fromValue(invoice.getCurrency())
+                );
+            } catch (Exception e) {
+                log.warn("Invalid currency code: {}, defaulting to GBP", invoice.getCurrency());
+                xeroInvoice.setCurrencyCode(com.xero.models.accounting.CurrencyCode.GBP);
+            }
+
+            LineItem lineItem = new LineItem();
+            String description = invoice.getDescription();
+            if (description == null || description.isEmpty()) {
+                description = "Invoice #" + invoice.getId();
+            }
+            lineItem.setDescription(description);
+            lineItem.setQuantity(1.0);
+            
+            double amount = invoice.getAmount().doubleValue();
+            if (amount <= 0) {
+                log.warn("⚠️ Invoice {} has invalid amount: {}, setting to 1.00", invoice.getId(), amount);
+                amount = 1.00;
+            }
+            lineItem.setUnitAmount(amount);
+            lineItem.setAccountCode("200");
+            xeroInvoice.setLineItems(Collections.singletonList(lineItem));
+
+            Invoices invoicesWrapper = new Invoices();
+            invoicesWrapper.setInvoices(Collections.singletonList(xeroInvoice));
+
+            String idempotencyKey = "inv-" + invoice.getId() + "-" + UUID.randomUUID();
+
+            log.info("📤 Syncing invoice {} to Xero: Reference={}, Amount={}, Tenant={}", 
+                    invoice.getId(), xeroInvoice.getReference(), invoice.getAmount(), tenantId);
 
             Invoices response = accountingApi.createInvoices(
                     token.getAccessToken(),
@@ -137,80 +144,77 @@ public class XeroInvoiceService {
             );
 
             if (response == null || response.getInvoices() == null || response.getInvoices().isEmpty()) {
-                log.error("❌ No invoice returned from Xero");
+                log.error("❌ No invoice returned from Xero for tenant: {}", tenantId);
                 return null;
             }
 
             com.xero.models.accounting.Invoice createdInvoice = response.getInvoices().get(0);
             
             if (createdInvoice.getInvoiceID() == null) {
-                log.error("❌ Xero returned invoice with null ID");
+                log.error("❌ Xero returned invoice with null ID for tenant: {}", tenantId);
                 return null;
             }
 
             String xeroInvoiceId = createdInvoice.getInvoiceID().toString();
             
             if (FAKE_XERO_ID.equals(xeroInvoiceId)) {
-                log.error("❌ Xero returned fake ID");
+                log.error("❌ Xero returned fake ID for tenant: {}", tenantId);
                 return null;
             }
 
             invoice.setXeroInvoiceId(xeroInvoiceId);
             invoiceRepository.save(invoice);
             
-            log.info("✅ Invoice {} synced to Xero with ID: {}", invoice.getId(), xeroInvoiceId);
+            log.info("✅ Invoice {} synced to Xero with ID: {} for tenant: {}", 
+                    invoice.getId(), xeroInvoiceId, tenantId);
             return xeroInvoiceId;
 
         } catch (com.xero.api.XeroBadRequestException e) {
             log.error("❌ Xero Bad Request: {}", e.getMessage());
-            if (e.getElements() != null && !e.getElements().isEmpty()) {
-                for (com.xero.models.accounting.Element element : e.getElements()) {
-                    if (element.getValidationErrors() != null) {
-                        for (com.xero.models.accounting.ValidationError error : element.getValidationErrors()) {
-                            log.error("   Validation error: {}", error.getMessage());
-                        }
-                    }
-                }
-            }
             return null;
         } catch (Exception e) {
-            log.error("❌ Failed to sync invoice: {}", e.getMessage(), e);
+            log.warn("⚠️ Failed to sync invoice {} to Xero: {}", invoice.getId(), e.getMessage());
             return null;
         }
     }
 
-    // ===== SYNC PAYMENT TO XERO =====
-    @Transactional
+    // ============================================================
+    // ✅ SYNC PAYMENT TO XERO - Returns null instead of throwing
+    // ============================================================
+    @Transactional(noRollbackFor = Exception.class)
     public String syncPaymentToXero(Invoice invoice, Long transactionId) {
         try {
-            log.info("📤 Syncing payment for invoice {} to Xero: Amount={}, Invoice ID={}", 
-                    invoice.getId(), invoice.getAmount(), invoice.getXeroInvoiceId());
+            Long tenantId = invoice.getTenantId();
+            if (tenantId == null) {
+                tenantId = TenantContext.getRequiredTenantId();
+            }
+            
+            log.info("📤 Syncing payment for invoice {} to Xero for tenant: {}", invoice.getId(), tenantId);
 
             if (invoice.getXeroInvoiceId() == null || invoice.getXeroInvoiceId().isEmpty()) {
-                log.warn("⚠️ Invoice {} has no Xero ID, cannot sync payment", invoice.getId());
+                log.warn("⚠️ Invoice {} has no Xero ID, cannot sync payment for tenant: {}", 
+                        invoice.getId(), tenantId);
                 String xeroId = syncInvoiceToXero(invoice);
                 if (xeroId == null) {
-                    log.error("❌ Could not sync invoice {} to Xero, payment not synced", invoice.getId());
+                    log.warn("⏭️ Could not sync invoice {} to Xero, skipping payment sync", invoice.getId());
                     return null;
                 }
                 invoice.setXeroInvoiceId(xeroId);
                 invoiceRepository.save(invoice);
             }
 
-            Long tenantId = TenantContext.getRequiredTenantId();
             XeroToken token = xeroOAuthService.getValidToken(tenantId);
 
             if (token == null) {
-                log.warn("No Xero token found for tenant: {}", tenantId);
+                log.warn("⏭️ No Xero token found for tenant: {}, skipping payment sync", tenantId);
                 return null;
             }
 
             AccountingApi accountingApi = AccountingApi.getInstance(defaultClient);
 
-            // ✅ Get account for payment
-            Account account = getAccountForPayment(accountingApi, token);
+            Account account = getAccountForPayment(accountingApi, token, tenantId);
             if (account == null) {
-                log.error("❌ No account found for payment");
+                log.error("❌ No account found for payment for tenant: {}", tenantId);
                 return null;
             }
 
@@ -233,8 +237,8 @@ public class XeroInvoiceService {
                 // Ignore if not supported
             }
 
-            log.info("📤 Sending payment to Xero: Amount={}, Date={}, Account Type={}, Code={}", 
-                    invoice.getAmount(), paymentDate, account.getType(), account.getCode());
+            log.info("📤 Sending payment to Xero: Amount={}, Date={}, Account Type={}, Code={}, Tenant={}", 
+                    invoice.getAmount(), paymentDate, account.getType(), account.getCode(), tenantId);
 
             com.xero.models.accounting.Payments response = accountingApi.createPayment(
                     token.getAccessToken(),
@@ -244,38 +248,28 @@ public class XeroInvoiceService {
                 );
 
             if (response == null || response.getPayments() == null || response.getPayments().isEmpty()) {
-                log.error("❌ No payment returned from Xero");
+                log.error("❌ No payment returned from Xero for tenant: {}", tenantId);
                 return null;
             }
 
             String paymentId = response.getPayments().get(0).getPaymentID().toString();
-            log.info("✅ Payment {} synced to Xero for invoice {} with ID: {}", 
-                    transactionId, invoice.getId(), paymentId);
+            log.info("✅ Payment {} synced to Xero for invoice {} with ID: {} for tenant: {}", 
+                    transactionId, invoice.getId(), paymentId, tenantId);
 
             return paymentId;
 
         } catch (com.xero.api.XeroBadRequestException e) {
             log.error("❌ Xero Bad Request for payment: {}", e.getMessage());
-            if (e.getElements() != null && !e.getElements().isEmpty()) {
-                for (com.xero.models.accounting.Element element : e.getElements()) {
-                    if (element.getValidationErrors() != null) {
-                        for (com.xero.models.accounting.ValidationError error : element.getValidationErrors()) {
-                            log.error("   Validation error: {}", error.getMessage());
-                        }
-                    }
-                }
-            }
             return null;
         } catch (Exception e) {
-            log.error("❌ Failed to sync payment for invoice {}: {}", invoice.getId(), e.getMessage(), e);
+            log.warn("⚠️ Failed to sync payment for invoice {}: {}", invoice.getId(), e.getMessage());
             return null;
         }
     }
 
-    // ===== GET ACCOUNT FOR PAYMENT - SUPPORTS ALL ACCOUNT TYPES =====
-    private Account getAccountForPayment(AccountingApi accountingApi, XeroToken token) {
+    // ===== GET ACCOUNT FOR PAYMENT =====
+    private Account getAccountForPayment(AccountingApi accountingApi, XeroToken token, Long tenantId) {
         try {
-            // 1️⃣ Try BANK account
             com.xero.models.accounting.Accounts accounts = accountingApi.getAccounts(
                 token.getAccessToken(),
                 token.getXeroTenantId(),
@@ -285,13 +279,9 @@ public class XeroInvoiceService {
             );
             
             if (accounts != null && accounts.getAccounts() != null && !accounts.getAccounts().isEmpty()) {
-                Account bankAccount = accounts.getAccounts().get(0);
-                log.info("✅ Found BANK account: Code={}, AccountID={}", 
-                        bankAccount.getCode(), bankAccount.getAccountID());
-                return bankAccount;
+                return accounts.getAccounts().get(0);
             }
             
-            // 2️⃣ Try CURRENT_ASSET account (your 090 account)
             com.xero.models.accounting.Accounts currentAssetAccounts = accountingApi.getAccounts(
                 token.getAccessToken(),
                 token.getXeroTenantId(),
@@ -301,45 +291,9 @@ public class XeroInvoiceService {
             );
             
             if (currentAssetAccounts != null && currentAssetAccounts.getAccounts() != null && !currentAssetAccounts.getAccounts().isEmpty()) {
-                Account currentAssetAccount = currentAssetAccounts.getAccounts().get(0);
-                log.info("✅ Found CURRENT_ASSET account: Code={}, AccountID={}", 
-                        currentAssetAccount.getCode(), currentAssetAccount.getAccountID());
-                return currentAssetAccount;
+                return currentAssetAccounts.getAccounts().get(0);
             }
             
-            // 3️⃣ Try account code 090 specifically
-            com.xero.models.accounting.Accounts account090 = accountingApi.getAccounts(
-                token.getAccessToken(),
-                token.getXeroTenantId(),
-                null,
-                "Code==\"090\"",
-                null
-            );
-            
-            if (account090 != null && account090.getAccounts() != null && !account090.getAccounts().isEmpty()) {
-                Account account = account090.getAccounts().get(0);
-                log.info("✅ Found account 090: Code=090, AccountID={}, Type={}", 
-                        account.getAccountID(), account.getType());
-                return account;
-            }
-            
-            // 4️⃣ Try account code 200 (Revenue)
-            com.xero.models.accounting.Accounts revenueAccounts = accountingApi.getAccounts(
-                token.getAccessToken(),
-                token.getXeroTenantId(),
-                null,
-                "Code==\"200\"",
-                null
-            );
-            
-            if (revenueAccounts != null && revenueAccounts.getAccounts() != null && !revenueAccounts.getAccounts().isEmpty()) {
-                Account revenueAccount = revenueAccounts.getAccounts().get(0);
-                log.info("✅ Using Revenue/200 account for payment: Code=200, AccountID={}", 
-                        revenueAccount.getAccountID());
-                return revenueAccount;
-            }
-            
-            // 5️⃣ Try any active account
             com.xero.models.accounting.Accounts allAccounts = accountingApi.getAccounts(
                 token.getAccessToken(),
                 token.getXeroTenantId(),
@@ -349,14 +303,10 @@ public class XeroInvoiceService {
             );
             
             if (allAccounts != null && allAccounts.getAccounts() != null && !allAccounts.getAccounts().isEmpty()) {
-                Account firstAccount = allAccounts.getAccounts().get(0);
-                log.info("✅ Using fallback account: Code={}, AccountID={}, Type={}", 
-                        firstAccount.getCode(), firstAccount.getAccountID(), firstAccount.getType());
-                return firstAccount;
+                return allAccounts.getAccounts().get(0);
             }
             
-            // 6️⃣ Ultimate fallback: Create account in memory
-            log.warn("⚠️ No accounts found, creating default account in memory");
+            log.warn("⚠️ No accounts found for tenant {}, creating default account", tenantId);
             Account defaultAccount = new Account();
             defaultAccount.setCode("DEFAULT");
             defaultAccount.setName("Default Account");
@@ -365,7 +315,7 @@ public class XeroInvoiceService {
             return defaultAccount;
             
         } catch (Exception e) {
-            log.error("❌ Failed to fetch accounts: {}", e.getMessage());
+            log.warn("⚠️ Failed to fetch accounts for tenant {}: {}", tenantId, e.getMessage());
             Account defaultAccount = new Account();
             defaultAccount.setCode("DEFAULT");
             defaultAccount.setName("Default Account");
@@ -381,19 +331,21 @@ public class XeroInvoiceService {
         return "/Date(" + epochMillis + ")/";
     }
 
-    // ===== GET INVOICE FROM XERO =====
-    public com.xero.models.accounting.Invoice getInvoiceFromXero(String xeroInvoiceId) throws Exception {
-        Long tenantId = TenantContext.getRequiredTenantId();
-        XeroToken token = xeroOAuthService.getValidToken(tenantId);
-
-        if (token == null) {
-            log.warn("No Xero token found for tenant: {}", tenantId);
-            return null;
-        }
-
-        AccountingApi accountingApi = AccountingApi.getInstance(defaultClient);
-
+    // ============================================================
+    // ✅ GET INVOICE FROM XERO - Returns null instead of throwing
+    // ============================================================
+    public com.xero.models.accounting.Invoice getInvoiceFromXero(String xeroInvoiceId) {
         try {
+            Long tenantId = TenantContext.getRequiredTenantId();
+            XeroToken token = xeroOAuthService.getValidToken(tenantId);
+
+            if (token == null) {
+                log.warn("No Xero token found for tenant: {}", tenantId);
+                return null;
+            }
+
+            AccountingApi accountingApi = AccountingApi.getInstance(defaultClient);
+
             Invoices response = accountingApi.getInvoice(
                     token.getAccessToken(),
                     token.getXeroTenantId(),
@@ -408,8 +360,16 @@ public class XeroInvoiceService {
             return response.getInvoices().get(0);
 
         } catch (Exception e) {
-            log.error("❌ Failed to get invoice from Xero: {}", e.getMessage());
-            throw e;
+            log.warn("⚠️ Failed to get invoice from Xero: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean isConnected(Long tenantId) {
+        try {
+            return xeroOAuthService.isConnected(tenantId);
+        } catch (Exception e) {
+            return false;
         }
     }
 }

@@ -40,7 +40,6 @@ public class XeroOAuthService {
     private final String TOKEN_SERVER_URL = "https://identity.xero.com/connect/token";
     private final String AUTHORIZATION_SERVER_URL = "https://login.xero.com/identity/connect/authorize";
 
-    // Default credentials from environment (used as fallback)
     private static String DEFAULT_CLIENT_ID;
     private static String DEFAULT_CLIENT_SECRET;
 
@@ -55,23 +54,26 @@ public class XeroOAuthService {
         XeroToken token = tokenRepository.findByTenantId(tenantId).orElse(null);
         
         if (token != null && token.getClientId() != null && token.getClientSecret() != null) {
-            log.info("🔑 Using custom Xero credentials for tenant: {}", tenantId);
+            log.debug("🔑 Using custom Xero credentials for tenant: {}", tenantId);
             return new XeroCredentials(token.getClientId(), token.getClientSecret());
         }
 
         if (DEFAULT_CLIENT_ID == null || DEFAULT_CLIENT_SECRET == null) {
-            log.error("❌ No Xero credentials found for tenant: {}", tenantId);
-            throw new IllegalStateException("Xero credentials not configured. Please connect your Xero account first.");
+            log.warn("⚠️ No default Xero credentials found for tenant: {}", tenantId);
+            return null;
         }
 
-        log.info("🔑 Using default Xero credentials for tenant: {}", tenantId);
+        log.debug("🔑 Using default Xero credentials for tenant: {}", tenantId);
         return new XeroCredentials(DEFAULT_CLIENT_ID, DEFAULT_CLIENT_SECRET);
     }
 
     public String getAuthorizationUrlForTenant(Long tenantId) {
         XeroCredentials creds = getCredentialsForTenant(tenantId);
+        if (creds == null) {
+            throw new IllegalStateException("No Xero credentials configured for tenant " + tenantId);
+        }
+        
         String secretState = "secret" + new Random().nextInt(999_999);
-
         ArrayList<String> scopeList = getScopes();
 
         try {
@@ -94,7 +96,7 @@ public class XeroOAuthService {
                     .setRedirectUri(redirectUri)
                     .build();
 
-            log.info("🔍 Generated Xero auth URL for tenant: {}", tenantId);
+            log.debug("🔍 Generated Xero auth URL for tenant: {}", tenantId);
             return url;
 
         } catch (Exception e) {
@@ -108,6 +110,10 @@ public class XeroOAuthService {
         log.info("🔄 Exchanging code for tokens for tenant: {}", tenantId);
 
         XeroCredentials creds = getCredentialsForTenant(tenantId);
+        if (creds == null) {
+            throw new IllegalStateException("No Xero credentials configured for tenant " + tenantId);
+        }
+        
         ArrayList<String> scopeList = getScopes();
 
         AuthorizationCodeFlow flow = new AuthorizationCodeFlow.Builder(
@@ -128,12 +134,9 @@ public class XeroOAuthService {
 
         DecodedJWT verifiedJWT = defaultClient.verify(tokenResponse.getAccessToken());
 
-        // ✅ FIX: Create Identity client with correct base path
-        // Identity API uses https://api.xero.com (without /api.xro/2.0)
         ApiClient identityClient = new ApiClient("https://api.xero.com", null, null, null, null);
         IdentityApi idApi = new IdentityApi(identityClient);
         
-        // ✅ Pass access token as parameter, NOT on the client
         List<Connection> connections = idApi.getConnections(tokenResponse.getAccessToken(), null);
 
         if (connections == null || connections.isEmpty()) {
@@ -166,6 +169,9 @@ public class XeroOAuthService {
                 .orElseThrow(() -> new RuntimeException("No Xero token found for tenant: " + tenantId));
 
         XeroCredentials creds = getCredentialsForTenant(tenantId);
+        if (creds == null) {
+            throw new IllegalStateException("No Xero credentials configured for tenant " + tenantId);
+        }
 
         try {
             TokenResponse tokenResponse = new RefreshTokenRequest(
@@ -192,15 +198,23 @@ public class XeroOAuthService {
         }
     }
 
-    public XeroToken getValidToken(Long tenantId) throws Exception {
-        XeroToken token = tokenRepository.findValidTokenByTenantId(tenantId).orElse(null);
+    // ============================================================
+    // ✅ FIXED: Returns null instead of throwing
+    // ============================================================
+    public XeroToken getValidToken(Long tenantId) {
+        try {
+            XeroToken token = tokenRepository.findValidTokenByTenantId(tenantId).orElse(null);
 
-        if (token == null) {
-            log.info("Token expired or not found, refreshing for tenant: {}", tenantId);
-            token = refreshToken(tenantId);
+            if (token == null) {
+                log.info("Token expired or not found, attempting refresh for tenant: {}", tenantId);
+                token = refreshToken(tenantId);
+            }
+
+            return token;
+        } catch (Exception e) {
+            log.warn("⚠️ Could not get valid Xero token for tenant {}: {}", tenantId, e.getMessage());
+            return null;
         }
-
-        return token;
     }
 
     @Transactional
@@ -210,7 +224,15 @@ public class XeroOAuthService {
     }
 
     public boolean isConnected(Long tenantId) {
-        return tokenRepository.findByTenantId(tenantId).isPresent();
+        try {
+            return tokenRepository.findByTenantId(tenantId).isPresent();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public List<XeroToken> getAllConnectedTenants() {
+        return tokenRepository.findAll();
     }
 
     public boolean hasCustomCredentials(Long tenantId) {

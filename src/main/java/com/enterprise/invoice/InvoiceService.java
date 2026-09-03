@@ -6,6 +6,7 @@ import com.enterprise.feature.FeatureFlagService;
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.UserRepository;
 import com.enterprise.notification.NotificationService;
+import com.enterprise.tax.TaxService;
 import com.enterprise.tenant.TenantContext;
 import com.enterprise.xero.service.XeroInvoiceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +49,7 @@ public class InvoiceService {
     private final RestTemplate restTemplate;
     private final FeatureFlagService featureFlagService;
     private final XeroInvoiceService xeroInvoiceService;
+    private final TaxService taxService;  // ✅ ADDED
 
     public InvoiceService(InvoiceRepository invoiceRepository,
                           NotificationService notificationService,
@@ -58,7 +60,8 @@ public class InvoiceService {
                           ObjectMapper objectMapper,
                           RestTemplate restTemplate,
                           FeatureFlagService featureFlagService,
-                          XeroInvoiceService xeroInvoiceService) {
+                          XeroInvoiceService xeroInvoiceService,
+                          TaxService taxService) {  // ✅ ADDED
         this.invoiceRepository = invoiceRepository;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
@@ -69,6 +72,7 @@ public class InvoiceService {
         this.restTemplate = restTemplate;
         this.featureFlagService = featureFlagService;
         this.xeroInvoiceService = xeroInvoiceService;
+        this.taxService = taxService;  // ✅ ADDED
     }
 
     // ===== PRIMARY CREATE INVOICE =====
@@ -100,6 +104,34 @@ public class InvoiceService {
         invoice.setReturnUrl(returnUrl);
         invoice.setOrderKey(orderKey);
 
+        // ============================================================
+        // ✅ TAX CALCULATION - USING VATLAYER API
+        // ============================================================
+        String customerCountry = getCustomerCountry(customerEmail);
+        boolean isB2B = false; // Can be determined from customer profile
+
+        if (customerCountry != null && !customerCountry.isEmpty()) {
+            try {
+                TaxService.TaxCalculation taxCalc = taxService.calculateTax(amount, customerCountry, isB2B);
+                invoice.setTaxAmount(taxCalc.getTaxAmount());
+                invoice.setTaxRate(taxCalc.getTaxRate());
+                invoice.setTaxName(taxCalc.getTaxName());
+                invoice.setTotalWithTax(taxCalc.getTotalWithTax());
+                invoice.setCustomerCountry(customerCountry);
+                invoice.setB2B(isB2B);
+                log.info("✅ Tax calculated for invoice: {}% {} = {} (total: {})",
+                        taxCalc.getTaxRate(), taxCalc.getTaxName(),
+                        taxCalc.getTaxAmount(), taxCalc.getTotalWithTax());
+            } catch (Exception e) {
+                log.warn("⚠️ Tax calculation failed: {}", e.getMessage());
+                invoice.setTotalWithTax(amount);
+                invoice.setTaxAmount(BigDecimal.ZERO);
+            }
+        } else {
+            invoice.setTotalWithTax(amount);
+            invoice.setTaxAmount(BigDecimal.ZERO);
+        }
+
         SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
         invoice.setRiskLevel(result.getRiskLevel());
         invoice.setSuspicionReason(result.getReason());
@@ -122,7 +154,8 @@ public class InvoiceService {
         auditService.recordEvent(
                 "INVOICE_CREATED",
                 merchantId,
-                Map.of("invoiceId", invoice.getId(), "amount", amount, "customer", customerEmail, "currency", currency),
+                Map.of("invoiceId", invoice.getId(), "amount", amount, "customer", customerEmail, "currency", currency,
+                       "taxAmount", invoice.getTaxAmount(), "totalWithTax", invoice.getTotalWithTax()),
                 "Invoice",
                 invoice.getId(),
                 beforeMap,
@@ -168,8 +201,7 @@ public class InvoiceService {
             }
         }
 
-        // ===== SYNC TO XERO (ONLY IF NO APPROVAL REQUIRED) =====
-        // If invoice doesn't need approval, sync immediately
+        // Sync to Xero (only if no approval required)
         if (!needsApproval) {
             syncToXeroIfConnected(invoice);
         } else {
@@ -178,6 +210,63 @@ public class InvoiceService {
 
         log.info("✅ Invoice {} created successfully", invoice.getId());
         return invoice;
+    }
+
+    // ============================================================
+    // ✅ HELPER: Detect Country from Email
+    // ============================================================
+    private String getCustomerCountry(String email) {
+        if (email == null || !email.contains("@")) {
+            return null;
+        }
+        String domain = email.substring(email.indexOf("@") + 1).toLowerCase();
+
+        // Map common email domains/TLDs to countries
+        if (domain.endsWith(".co.uk") || domain.endsWith(".ac.uk") || domain.endsWith(".gov.uk")) {
+            return "GB";
+        } else if (domain.endsWith(".de")) {
+            return "DE";
+        } else if (domain.endsWith(".fr")) {
+            return "FR";
+        } else if (domain.endsWith(".es")) {
+            return "ES";
+        } else if (domain.endsWith(".it")) {
+            return "IT";
+        } else if (domain.endsWith(".nl")) {
+            return "NL";
+        } else if (domain.endsWith(".be")) {
+            return "BE";
+        } else if (domain.endsWith(".pl")) {
+            return "PL";
+        } else if (domain.endsWith(".pt")) {
+            return "PT";
+        } else if (domain.endsWith(".ie")) {
+            return "IE";
+        } else if (domain.endsWith(".at")) {
+            return "AT";
+        } else if (domain.endsWith(".se")) {
+            return "SE";
+        } else if (domain.endsWith(".fi")) {
+            return "FI";
+        } else if (domain.endsWith(".dk")) {
+            return "DK";
+        } else if (domain.endsWith(".no")) {
+            return "NO";
+        } else if (domain.endsWith(".ch")) {
+            return "CH";
+        } else if (domain.endsWith(".com") || domain.endsWith(".org") || domain.endsWith(".net")) {
+            return null; // Unknown - could be US or international
+        } else {
+            // Try to detect from TLD (if it's a 2-letter country code)
+            String[] parts = domain.split("\\.");
+            if (parts.length > 0) {
+                String lastPart = parts[parts.length - 1];
+                if (lastPart.length() == 2) {
+                    return lastPart.toUpperCase();
+                }
+            }
+        }
+        return null;
     }
 
     // ===== OVERLOADS =====
@@ -208,31 +297,29 @@ public class InvoiceService {
     }
 
     // ===== SYNC INVOICE TO XERO =====
+    @Transactional(noRollbackFor = Exception.class)
     private void syncToXeroIfConnected(Invoice invoice) {
         try {
             Long tenantId = invoice.getTenantId();
             if (tenantId != null && xeroInvoiceService != null) {
-                // ✅ Only sync if invoice is APPROVED (not PENDING_APPROVAL)
                 if (!"APPROVED".equals(invoice.getStatus())) {
-                    log.debug("⏳ Invoice {} is not approved yet (status: {}), skipping Xero sync", 
+                    log.debug("⏳ Invoice {} is not approved yet (status: {}), skipping Xero sync",
                             invoice.getId(), invoice.getStatus());
                     return;
                 }
-                
-                // ✅ Check if already synced (has Xero ID)
+
                 if (invoice.getXeroInvoiceId() != null && !invoice.getXeroInvoiceId().isEmpty()) {
-                    log.debug("⏭️ Invoice {} already synced to Xero with ID: {}", 
+                    log.debug("⏭️ Invoice {} already synced to Xero with ID: {}",
                             invoice.getId(), invoice.getXeroInvoiceId());
                     return;
                 }
-                
+
                 String xeroId = xeroInvoiceService.syncInvoiceToXero(invoice);
                 if (xeroId != null) {
                     log.info("✅ Invoice {} synced to Xero with ID: {}", invoice.getId(), xeroId);
                 }
             }
         } catch (Exception e) {
-            // Don't fail the transaction if Xero sync fails
             log.warn("⚠️ Failed to sync invoice {} to Xero: {}", invoice.getId(), e.getMessage());
         }
     }
@@ -295,13 +382,19 @@ public class InvoiceService {
             );
         }
 
-        // ===== SYNC TO XERO (NOW THAT IT'S APPROVED) =====
-        syncToXeroIfConnected(afterEntity);
+        try {
+            syncToXeroIfConnected(afterEntity);
+        } catch (Exception e) {
+            log.warn("⚠️ Xero sync failed for invoice {}: {}", invoiceId, e.getMessage());
+        }
 
-        // ===== SEND WEBHOOK ASYNCHRONOUSLY =====
-        sendApprovalWebhookAsync(afterEntity);
+        try {
+            sendApprovalWebhookAsync(afterEntity);
+        } catch (Exception e) {
+            log.warn("⚠️ Webhook failed for invoice {}: {}", invoiceId, e.getMessage());
+        }
 
-        log.info("✅ Invoice {} approved and synced to Xero", invoiceId);
+        log.info("✅ Invoice {} approved", invoiceId);
         return afterEntity;
     }
 
@@ -362,14 +455,16 @@ public class InvoiceService {
             );
         }
 
-        // ===== SEND WEBHOOK ASYNCHRONOUSLY =====
-        sendRejectionWebhookAsync(afterEntity, reason);
+        try {
+            sendRejectionWebhookAsync(afterEntity, reason);
+        } catch (Exception e) {
+            log.warn("⚠️ Webhook failed for invoice {}: {}", invoiceId, e.getMessage());
+        }
 
         log.info("✅ Invoice {} rejected successfully", invoiceId);
         return afterEntity;
     }
 
-    // ===== OVERLOAD for backward compatibility =====
     @Transactional
     public Invoice rejectInvoice(Long invoiceId, Long adminId) {
         return rejectInvoice(invoiceId, adminId, null);
@@ -464,65 +559,65 @@ public class InvoiceService {
     }
 
     // ===== MARK AS PAID =====
-  @Transactional(noRollbackFor = Exception.class)
-public void markAsPaid(Long invoiceId, Long transactionId) {
-    log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
-    
-    Invoice beforeEntity = invoiceRepository.findById(invoiceId)
-            .orElseThrow(() -> new RuntimeException("Invoice not found"));
-    Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
+    @Transactional(noRollbackFor = Exception.class)
+    public void markAsPaid(Long invoiceId, Long transactionId) {
+        log.info("💳 Marking invoice {} as paid with transaction {}", invoiceId, transactionId);
 
-    Invoice invoice = invoiceRepository.findById(invoiceId)
-            .orElseThrow(() -> new RuntimeException("Invoice not found"));
-    if (!"APPROVED".equals(invoice.getStatus())) {
-        log.warn("⚠️ Invoice {} is not approved (status: {})", invoiceId, invoice.getStatus());
-        throw new IllegalStateException("Invoice is not approved");
-    }
-    invoice.setStatus("PAID");
-    invoice.setUpdatedAt(LocalDateTime.now());
-    Invoice afterEntity = invoiceRepository.save(invoice);
-    Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
+        Invoice beforeEntity = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        Map<String, Object> before = objectMapper.convertValue(beforeEntity, Map.class);
 
-    auditService.recordEvent(
-            "INVOICE_PAID",
-            invoice.getMerchantId(),
-            Map.of("invoiceId", invoiceId, "transactionId", transactionId),
-            "Invoice",
-            invoiceId,
-            before,
-            after
-    );
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        if (!"APPROVED".equals(invoice.getStatus())) {
+            log.warn("⚠️ Invoice {} is not approved (status: {})", invoiceId, invoice.getStatus());
+            throw new IllegalStateException("Invoice is not approved");
+        }
+        invoice.setStatus("PAID");
+        invoice.setUpdatedAt(LocalDateTime.now());
+        Invoice afterEntity = invoiceRepository.save(invoice);
+        Map<String, Object> after = objectMapper.convertValue(afterEntity, Map.class);
 
-    notificationService.createNotification(
-            invoice.getMerchantId(),
-            "INVOICE_PAID",
-            "Invoice Paid",
-            String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
-            "/transactions/" + transactionId
-    );
-    Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
-    if (customerId != null) {
+        auditService.recordEvent(
+                "INVOICE_PAID",
+                invoice.getMerchantId(),
+                Map.of("invoiceId", invoiceId, "transactionId", transactionId),
+                "Invoice",
+                invoiceId,
+                before,
+                after
+        );
+
         notificationService.createNotification(
-                customerId,
+                invoice.getMerchantId(),
                 "INVOICE_PAID",
                 "Invoice Paid",
-                String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
+                String.format("Invoice #%d paid (Transaction #%d)", invoiceId, transactionId),
                 "/transactions/" + transactionId
         );
+        Long customerId = getUserIdByEmail(invoice.getCustomerEmail());
+        if (customerId != null) {
+            notificationService.createNotification(
+                    customerId,
+                    "INVOICE_PAID",
+                    "Invoice Paid",
+                    String.format("Invoice #%d was paid (Transaction #%d)", invoiceId, transactionId),
+                    "/transactions/" + transactionId
+            );
+        }
+
+        try {
+            String paymentId = xeroInvoiceService.syncPaymentToXero(invoice, transactionId);
+            if (paymentId != null) {
+                log.info("✅ Payment {} synced to Xero for invoice {}", paymentId, invoiceId);
+            } else {
+                log.warn("⚠️ Payment sync to Xero failed for invoice {}", invoiceId);
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to sync payment to Xero for invoice {}: {}", invoiceId, e.getMessage());
+        }
     }
 
-    // ===== ✅ SYNC PAYMENT TO XERO =====
-    try {
-        String paymentId = xeroInvoiceService.syncPaymentToXero(invoice, transactionId);
-        if (paymentId != null) {
-            log.info("✅ Payment {} synced to Xero for invoice {}", paymentId, invoiceId);
-        } else {
-            log.warn("⚠️ Payment sync to Xero failed for invoice {}", invoiceId);
-        }
-    } catch (Exception e) {
-        log.warn("⚠️ Failed to sync payment to Xero for invoice {}: {}", invoiceId, e.getMessage());
-    }
-}
     public boolean isInvoicePaid(Long invoiceId) {
         return invoiceRepository.findById(invoiceId)
                 .map(inv -> "PAID".equals(inv.getStatus()))
@@ -584,13 +679,11 @@ public void markAsPaid(Long invoiceId, Long transactionId) {
         log.info("✅ Re-evaluation completed: {} invoices updated", updated);
     }
 
-    // ===== BACKWARD COMPATIBILITY - calls suspicion re-evaluation =====
     @Transactional
     public void reEvaluateAllInvoices() {
         reEvaluateAllInvoicesForSuspicion();
     }
 
-    // ===== RE-EVALUATE ALL INVOICES FOR SUSPICION =====
     @Transactional
     public void reEvaluateAllInvoicesForSuspicion() {
         if (!featureFlagService.isEnabled("SUSPICION_DETECTION")) {
@@ -620,21 +713,21 @@ public void markAsPaid(Long invoiceId, Long transactionId) {
         int updated = 0;
         int cleared = 0;
         int movedToSuspicious = 0;
-        
+
         for (Invoice invoice : allInvoices) {
             if ("PAID".equals(invoice.getStatus()) || "REJECTED".equals(invoice.getStatus())) {
                 continue;
             }
-            
+
             SuspicionService.SuspicionResult result = suspicionService.evaluate(invoice);
             String newRisk = result.getRiskLevel();
             String newReason = result.getReason();
-            
+
             String oldRisk = invoice.getRiskLevel();
-            
+
             if (!newRisk.equals(oldRisk) || !newReason.equals(invoice.getSuspicionReason())) {
                 invoiceRepository.updateRiskLevel(invoice.getId(), newRisk, newReason);
-                
+
                 if ("GREEN".equals(newRisk)) {
                     if (!approvalService.evaluate(invoice)) {
                         invoice.setRequiresApproval(false);
@@ -657,8 +750,8 @@ public void markAsPaid(Long invoiceId, Long transactionId) {
                 updated++;
             }
         }
-        
-        log.info("✅ Re-evaluation for suspicion completed: {} updated, {} cleared, {} moved to suspicious", 
+
+        log.info("✅ Re-evaluation for suspicion completed: {} updated, {} cleared, {} moved to suspicious",
                 updated, cleared, movedToSuspicious);
     }
 

@@ -1,22 +1,92 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<head><title>My Invoices</title></head>
+<head>
+    <title>My Invoices</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin: 20px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; }
+        .badge { padding: 4px 12px; border-radius: 12px; color: white; font-size: 12px; display: inline-block; }
+        .badge-approved { background: #2d7a3a; }
+        .badge-pending { background: #f39c12; }
+        .badge-paid { background: #2980b9; }
+        .badge-rejected { background: #c0392b; }
+        .badge-draft { background: #95a5a6; }
+        .btn { padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 12px; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2d7a3a; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .back-link { color: #007bff; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .amount { font-weight: bold; }
+        .nav-tabs { display: flex; gap: 5px; margin: 20px 0; border-bottom: 2px solid #ddd; flex-wrap: wrap; }
+        .nav-tabs a { padding: 10px 20px; text-decoration: none; color: #555; border-radius: 4px 4px 0 0; }
+        .nav-tabs a.active { background: #2d7a3a; color: white; }
+        .nav-tabs a:hover { background: #e9ecef; }
+        @media (max-width: 768px) {
+            table { font-size: 13px; }
+            th, td { padding: 8px; }
+        }
+    </style>
+</head>
 <body>
-    <h1>My Invoices</h1>
-    <a href="/dashboard">← Back to Dashboard</a>
-    <table border="1">
-        <tr><th>ID</th><th>Amount</th><th>Description</th><th>Status</th><th>Action</th></tr>
-        <tr th:each="inv : ${invoices}">
-            <td th:text="${inv.id}">1</td>
-            <td th:text="${currencyHelper.getFormattedAmount(inv.amount, inv.currency)}">£ 100.00</td>
-            <td th:text="${inv.description}">desc</td>
-            <td th:text="${inv.status}">APPROVED</td>
-            <td>
-                <a th:if="${inv.status == 'APPROVED'}" th:href="@{/pay/{id}(id=${inv.id})}" class="btn">Pay Now</a>
-                <a th:href="@{/invoices/{id}(id=${inv.id})}">View</a>
-            </td>
-        </tr>
-    </table>
+<div class="container">
+    <div class="header">
+        <h1>📄 My Invoices</h1>
+        <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+        <a href="/subscriptions/my">📋 My Subscriptions</a>
+        <a href="/subscriptions/plans">📊 Browse Plans</a>
+        <a href="/invoices/customer" class="active">📄 My Invoices</a>
+    </div>
+
+    <div class="card">
+        <div th:if="${invoices != null and !invoices.isEmpty()}">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="inv : ${invoices}">
+                        <td th:text="${inv.id}">1</td>
+                        <td th:text="${inv.description}">Test Invoice</td>
+                        <td class="amount" th:text="${currencyHelper.getFormattedAmount(inv.amount, inv.currency)}">£ 100.00</td>
+                        <td>
+                            <span class="badge" 
+                                  th:classappend="${inv.status == 'APPROVED' ? 'badge-approved' : inv.status == 'PENDING_APPROVAL' ? 'badge-pending' : inv.status == 'PAID' ? 'badge-paid' : inv.status == 'REJECTED' ? 'badge-rejected' : 'badge-draft'}"
+                                  th:text="${inv.status}">APPROVED</span>
+                        </td>
+                        <td th:text="${#temporals.format(inv.createdAt, 'yyyy-MM-dd')}">2026-09-01</td>
+                        <td>
+                            <a th:href="@{/invoices/{id}(id=${inv.id})}" class="btn btn-primary">View</a>
+                            <a th:if="${inv.status == 'APPROVED'}" th:href="@{/pay/{id}(id=${inv.id})}" class="btn btn-success">Pay Now</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:unless="${invoices != null and !invoices.isEmpty()}" class="empty">
+            <p>You don't have any invoices yet.</p>
+            <p style="font-size: 0.9em; color: #888;">Invoices will appear here when you subscribe to a plan or make a payment.</p>
+        </div>
+    </div>
+</div>
 </body>
 </html>

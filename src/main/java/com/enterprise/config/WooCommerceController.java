@@ -1,4 +1,4 @@
-package com.enterprise.config;
+package com.enterprise.api;
 
 import com.enterprise.identity.AppUser;
 import com.enterprise.identity.Role;
@@ -13,6 +13,7 @@ import com.enterprise.transaction.TransactionService;
 import com.enterprise.webhook.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;  // ✅ ADD THIS IMPORT
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,6 +59,9 @@ public class WooCommerceController {
         log.info("🔵 Tenant set to: {}", tenantId);
 
         try {
+            // ✅ Get or create customer
+            AppUser customer = getOrCreateCustomer(order, tenantId);
+
             Invoice invoice = invoiceService.createInvoice(
                     order.getTotal(),
                     "WooCommerce Order #" + order.getOrderId(),
@@ -73,6 +78,8 @@ public class WooCommerceController {
             Map<String, Object> response = new HashMap<>();
             response.put("invoiceId", invoice.getId());
             response.put("status", invoice.getStatus());
+            response.put("customerId", customer.getId());
+            response.put("customerEmail", customer.getEmail());
             return ResponseEntity.ok(response);
         } finally {
             TenantContext.clear();
@@ -85,21 +92,8 @@ public class WooCommerceController {
         TenantContext.setTenantId(tenantId);
 
         try {
-            AppUser customer = userRepository.findByEmail(order.getBillingEmail())
-                    .orElseGet(() -> {
-                        AppUser newUser = new AppUser();
-                        newUser.setEmail(order.getBillingEmail());
-                        String password = order.getCustomerPassword() != null ?
-                                order.getCustomerPassword() :
-                                UUID.randomUUID().toString();
-                        newUser.setPasswordHash(passwordEncoder.encode(password));
-                        newUser.setActive(true);
-                        newUser.setTenantId(tenantId);
-                        Role customerRole = roleRepository.findByName("CUSTOMER")
-                                .orElseThrow(() -> new RuntimeException("CUSTOMER role not found"));
-                        newUser.setRoles(Set.of(customerRole));
-                        return userRepository.save(newUser);
-                    });
+            // ✅ Get or create customer - handles duplicate emails
+            AppUser customer = getOrCreateCustomer(order, tenantId);
 
             Invoice invoice = invoiceService.createInvoice(
                     order.getTotal(),
@@ -125,7 +119,9 @@ public class WooCommerceController {
             webhookService.sendWebhooks("WOOCOMMERCE_ORDER_UPDATE", Map.of(
                     "orderId", order.getOrderId(),
                     "status", response.getStatus(),
-                    "transactionId", response.getTransactionId()
+                    "transactionId", response.getTransactionId(),
+                    "customerId", customer.getId(),
+                    "customerEmail", customer.getEmail()
             ));
 
             WooCommerceResponse wooResponse = new WooCommerceResponse(
@@ -138,6 +134,78 @@ public class WooCommerceController {
 
         } finally {
             TenantContext.clear();
+        }
+    }
+
+    // ============================================================
+    // ✅ HELPER: Get or Create Customer (Handles Duplicate Emails)
+    // ============================================================
+    private AppUser getOrCreateCustomer(WooCommerceOrder order, Long tenantId) {
+        String email = order.getBillingEmail();
+        
+        if (email == null || email.trim().isEmpty()) {
+            log.error("❌ No billing email provided in WooCommerce order");
+            throw new RuntimeException("Billing email is required");
+        }
+
+        // ✅ 1. Try to find existing user by email (case-insensitive)
+        Optional<AppUser> existingUser = userRepository.findByEmailIgnoreCase(email);
+        
+        if (existingUser.isPresent()) {
+            AppUser user = existingUser.get();
+            log.info("✅ Found existing customer: {} (ID: {})", email, user.getId());
+            
+            // ✅ Check if user is active
+            if (!user.isActive()) {
+                log.warn("⚠️ User {} is inactive, reactivating", email);
+                user.setActive(true);
+                user = userRepository.save(user);
+            }
+            
+            // ✅ Ensure user has CUSTOMER role
+            boolean hasCustomerRole = user.getRoles().stream()
+                    .anyMatch(r -> r.getName().equals("CUSTOMER"));
+            if (!hasCustomerRole) {
+                log.info("✅ Adding CUSTOMER role to user {}", email);
+                Role customerRole = roleRepository.findByName("CUSTOMER")
+                        .orElseThrow(() -> new RuntimeException("CUSTOMER role not found"));
+                user.getRoles().add(customerRole);
+                user = userRepository.save(user);
+            }
+            
+            return user;
+        }
+
+        // ✅ 2. No user found - create new one
+        log.info("📝 Creating new customer for email: {}", email);
+        
+        AppUser newUser = new AppUser();
+        newUser.setEmail(email);
+        
+        // ✅ 3. Generate password if not provided
+        String password = order.getCustomerPassword() != null && !order.getCustomerPassword().isEmpty()
+                ? order.getCustomerPassword()
+                : UUID.randomUUID().toString();
+        newUser.setPasswordHash(passwordEncoder.encode(password));
+        
+        newUser.setActive(true);
+        newUser.setTenantId(tenantId);
+        
+        // ✅ 4. Assign CUSTOMER role
+        Role customerRole = roleRepository.findByName("CUSTOMER")
+                .orElseThrow(() -> new RuntimeException("CUSTOMER role not found"));
+        newUser.setRoles(Set.of(customerRole));
+        
+        try {
+            AppUser savedUser = userRepository.save(newUser);
+            log.info("✅ Created new customer: {} (ID: {})", email, savedUser.getId());
+            return savedUser;
+            
+        } catch (DataIntegrityViolationException e) {
+            // ✅ 5. Race condition - another thread created the user
+            log.warn("⚠️ User creation race condition for email: {}, fetching existing", email);
+            return userRepository.findByEmailIgnoreCase(email)
+                    .orElseThrow(() -> new RuntimeException("Failed to create or find user: " + email));
         }
     }
 

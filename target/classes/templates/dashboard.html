@@ -139,36 +139,37 @@
         </div>
     </div>
 
-    <!-- ===== XERO INTEGRATION SECTION ===== -->
-    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin: 20px 0; background: #f8f9fa;">
-        <h3>📊 Xero Integration</h3>
-        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-            <span>Status: 
-                <span class="xero-status xero-connected" th:if="${xeroConnected}" style="background: #d4edda; color: #155724;">✅ Connected</span>
-                <span class="xero-status xero-disconnected" th:unless="${xeroConnected}" style="background: #f8d7da; color: #721c24;">❌ Not Connected</span>
+   <!-- ===== XERO INTEGRATION SECTION ===== -->
+<!-- ✅ Only visible to Super Admin and Merchant Admin -->
+<div th:if="${isSuperAdmin or isMerchantAdmin}" style="border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin: 20px 0; background: #f8f9fa;">
+    <h3>📊 Xero Integration</h3>
+    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+        <span>Status: 
+            <span class="xero-status xero-connected" th:if="${xeroConnected}" style="background: #d4edda; color: #155724;">✅ Connected</span>
+            <span class="xero-status xero-disconnected" th:unless="${xeroConnected}" style="background: #f8d7da; color: #721c24;">❌ Not Connected</span>
+        </span>
+        <span th:if="${xeroConnected}" style="font-size: 0.9em; color: #666;">
+            Tenant: <strong th:text="${xeroTenantId}">N/A</strong>
+        </span>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="/admin/xero/setup" class="btn" style="background: #2d7a3a; color: white;">
+                ⚙️ Xero Setup
+            </a>
+            <a href="/admin/xero" class="btn" style="background: #3498db; color: white;">
+                📊 Xero Dashboard
+            </a>
+            <span th:if="${xeroConnected}">
+                <form th:action="@{/admin/xero/sync}" method="post" style="display: inline;">
+                    <button type="submit" class="btn" style="background: #f39c12; color: white;">🔄 Sync Invoices</button>
+                </form>
             </span>
-            <span th:if="${xeroConnected}" style="font-size: 0.9em; color: #666;">
-                Tenant: <strong th:text="${xeroTenantId}">N/A</strong>
-            </span>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <a href="/admin/xero/setup" class="btn" style="background: #2d7a3a; color: white;">
-                    ⚙️ Xero Setup
-                </a>
-                <a href="/admin/xero" class="btn" style="background: #3498db; color: white;">
-                    📊 Xero Dashboard
-                </a>
-                <span th:if="${xeroConnected}">
-                    <form th:action="@{/admin/xero/sync}" method="post" style="display: inline;">
-                        <button type="submit" class="btn" style="background: #f39c12; color: white;">🔄 Sync Invoices</button>
-                    </form>
-                </span>
-            </div>
         </div>
-        <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
-            <span th:if="${xeroConnected}">✅ Xero is connected. Invoices will auto-sync when approved.</span>
-            <span th:unless="${xeroConnected}">🔗 Connect Xero to automatically sync approved invoices to your accounting.</span>
-        </p>
     </div>
+    <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+        <span th:if="${xeroConnected}">✅ Xero is connected. Invoices will auto-sync when approved.</span>
+        <span th:unless="${xeroConnected}">🔗 Connect Xero to automatically sync approved invoices to your accounting.</span>
+    </p>
+</div>
 
     <!-- Summary Cards -->
     <div style="display: flex; flex-wrap: wrap;">
@@ -347,6 +348,8 @@
 
     <hr/>
 
+    
+
     <!-- ========== SUSPICIOUS INVOICES WIDGET ========== -->
     <div sec:authorize="hasRole('ADMIN')">
         <div class="widget" th:class="${suspiciousCount > 0 ? 'widget widget-warning' : 'widget'}">
@@ -372,9 +375,6 @@
         <li sec:authorize="hasRole('MERCHANT')">
             <a href="/invoices/create">📄 Create Invoice</a>
         </li>
-        <li sec:authorize="hasRole('MERCHANT')">
-    <a href="/merchant/recurring">📆 Recurring Invoices</a>
-</li>
         <li sec:authorize="hasRole('MERCHANT')">
             <a href="/invoices/merchant">📋 My Invoices</a>
         </li>
@@ -407,6 +407,17 @@
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/rule-audit">📜 Rule Audit Trail</a>
         </li>
+        <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')">
+    <a href="/admin/api-keys/monitor">🔑 API Key Monitor</a>
+</li>
+  <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')">
+        <a href="/admin/tax">💰 Tax Rules</a>
+    </li>
+
+    <li sec:authorize="hasRole('MERCHANT')">
+    <a href="/merchant/subscriptions">📊 Subscription Dashboard</a>
+</li>
+
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/tenants">🏢 Manage Tenants</a>
         </li>
