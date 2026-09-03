@@ -32,6 +32,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/AuditViewController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/CorrelationIdFilter.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/CurrencyControllerAdvice.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/CustomerSubscriptionController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/DashboardController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/DebugFilter.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/ErrorResponse.java
@@ -44,6 +45,7 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/ImpersonationController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/InvoiceController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/LocaleController.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/MerchantSubscriptionController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/NotificationController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/NotificationSSEController.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/api/PaymentController.java
@@ -221,6 +223,15 @@
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/service/BulkJobService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/simulator/SimulatorService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/simulator/SimulatorToken.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/CustomerSubscription.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/CustomerSubscriptionRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/PaymentRetry.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/PaymentRetryRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/SubscriptionPlan.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/SubscriptionPlanRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/SubscriptionRequest.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/SubscriptionRequestRepository.java
+/workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/subscription/SubscriptionService.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/TaxRule.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/TaxRuleRepository.java
 /workspaces/enterprise-transaction-platform1/src/main/java/com/enterprise/tax/TaxService.java

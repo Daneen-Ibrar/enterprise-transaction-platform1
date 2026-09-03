@@ -26,20 +26,150 @@ public class SubscriptionService {
 
     private final CustomerSubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository planRepository;
+    private final SubscriptionRequestRepository requestRepository;
     private final PaymentRetryRepository paymentRetryRepository;
     private final InvoiceService invoiceService;
     private final NotificationService notificationService;
 
     public SubscriptionService(CustomerSubscriptionRepository subscriptionRepository,
                                SubscriptionPlanRepository planRepository,
+                               SubscriptionRequestRepository requestRepository,
                                PaymentRetryRepository paymentRetryRepository,
                                InvoiceService invoiceService,
                                NotificationService notificationService) {
         this.subscriptionRepository = subscriptionRepository;
         this.planRepository = planRepository;
+        this.requestRepository = requestRepository;
         this.paymentRetryRepository = paymentRetryRepository;
         this.invoiceService = invoiceService;
         this.notificationService = notificationService;
+    }
+
+    // ============================================================
+    // SUBSCRIPTION REQUEST MANAGEMENT
+    // ============================================================
+
+    @Transactional
+    public SubscriptionRequest createRequest(Long customerId, String customerEmail, Long merchantId, Long planId) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+
+        SubscriptionPlan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+        // Check if there's already a pending request for this customer and plan
+        List<SubscriptionRequest> pendingRequests = requestRepository.findByCustomerId(customerId)
+                .stream()
+                .filter(r -> r.getPlanId().equals(planId) && r.getStatus() == SubscriptionRequest.RequestStatus.PENDING)
+                .toList();
+
+        if (!pendingRequests.isEmpty()) {
+            throw new RuntimeException("You already have a pending request for this plan");
+        }
+
+        SubscriptionRequest request = new SubscriptionRequest();
+        request.setCustomerId(customerId);
+        request.setCustomerEmail(customerEmail);
+        request.setPlanId(planId);
+        request.setPlanName(plan.getName());
+        request.setMerchantId(merchantId);
+        request.setTenantId(tenantId);
+        request.setStatus(SubscriptionRequest.RequestStatus.PENDING);
+
+        SubscriptionRequest saved = requestRepository.save(request);
+
+        // Send notification to merchant admin
+        notificationService.createNotification(
+                merchantId,
+                "SUBSCRIPTION_REQUEST",
+                "New Subscription Request",
+                "Customer " + customerEmail + " wants to subscribe to " + plan.getName(),
+                "/merchant/subscriptions/requests"
+        );
+
+        log.info("✅ Subscription request created for customer {} to plan {}", customerEmail, plan.getName());
+        return saved;
+    }
+
+    @Transactional
+    public CustomerSubscription approveRequest(Long requestId, Long adminId) {
+        SubscriptionRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        if (request.getStatus() != SubscriptionRequest.RequestStatus.PENDING) {
+            throw new RuntimeException("Request already processed");
+        }
+
+        // Create the actual subscription
+        CustomerSubscription subscription = createSubscriptionInternal(
+                request.getCustomerId(),
+                request.getCustomerEmail(),
+                request.getMerchantId(),
+                request.getPlanId()
+        );
+
+        // Update request status
+        request.setStatus(SubscriptionRequest.RequestStatus.APPROVED);
+        request.setAssignedBy(adminId);
+        request.setAssignedAt(LocalDateTime.now());
+        request.setUpdatedAt(LocalDateTime.now());
+        requestRepository.save(request);
+
+        // Notify customer
+        notificationService.createNotification(
+                request.getCustomerId(),
+                "SUBSCRIPTION_APPROVED",
+                "Subscription Approved",
+                "Your subscription to " + request.getPlanName() + " has been approved!",
+                "/subscriptions/my"
+        );
+
+        log.info("✅ Subscription request {} approved by admin {}", requestId, adminId);
+        return subscription;
+    }
+
+    @Transactional
+    public void rejectRequest(Long requestId, Long adminId, String reason) {
+        SubscriptionRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        if (request.getStatus() != SubscriptionRequest.RequestStatus.PENDING) {
+            throw new RuntimeException("Request already processed");
+        }
+
+        request.setStatus(SubscriptionRequest.RequestStatus.REJECTED);
+        request.setAssignedBy(adminId);
+        request.setAssignedAt(LocalDateTime.now());
+        request.setUpdatedAt(LocalDateTime.now());
+        request.setNotes(reason);
+        requestRepository.save(request);
+
+        // Notify customer
+        notificationService.createNotification(
+                request.getCustomerId(),
+                "SUBSCRIPTION_REJECTED",
+                "Subscription Rejected",
+                "Your subscription request was rejected. Reason: " + (reason != null ? reason : "Not specified"),
+                "/subscriptions/plans"
+        );
+
+        log.info("✅ Subscription request {} rejected by admin {}", requestId, adminId);
+    }
+
+    public List<SubscriptionRequest> getPendingRequests(Long merchantId) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+        return requestRepository.findPendingByMerchantId(tenantId, merchantId);
+    }
+
+    public List<SubscriptionRequest> getRequestsForCustomer(Long customerId) {
+        return requestRepository.findByCustomerId(customerId);
+    }
+
+    public List<SubscriptionRequest> getAllRequestsForMerchant(Long merchantId) {
+        return requestRepository.findByMerchantIdAndStatus(merchantId, SubscriptionRequest.RequestStatus.PENDING);
+    }
+
+    public long getPendingRequestCount(Long merchantId) {
+        return requestRepository.countByMerchantIdAndStatus(merchantId, SubscriptionRequest.RequestStatus.PENDING);
     }
 
     // ============================================================
@@ -48,6 +178,11 @@ public class SubscriptionService {
 
     public List<SubscriptionPlan> getPlansForTenant(Long tenantId) {
         return planRepository.findActiveByTenantId(tenantId);
+    }
+
+    public SubscriptionPlan getPlanById(Long id) {
+        return planRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Plan not found: " + id));
     }
 
     @Transactional
@@ -79,6 +214,7 @@ public class SubscriptionService {
         plan.setActive(false);
         plan.setUpdatedAt(LocalDateTime.now());
         planRepository.save(plan);
+        log.info("Plan {} deactivated", id);
     }
 
     // ============================================================
@@ -93,12 +229,27 @@ public class SubscriptionService {
         SubscriptionPlan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        // Check for existing active subscription
-        subscriptionRepository.findByCustomerIdAndPlanIdAndStatus(
-                customerId, planId, CustomerSubscription.SubscriptionStatus.ACTIVE
-        ).ifPresent(s -> {
+        // Check for existing active subscription to this plan
+        List<CustomerSubscription> existing = subscriptionRepository
+                .findByCustomerIdAndPlanIdAndStatus(customerId, planId, CustomerSubscription.SubscriptionStatus.ACTIVE)
+                .stream().toList();
+
+        if (!existing.isEmpty()) {
             throw new RuntimeException("Customer already has an active subscription to this plan");
-        });
+        }
+
+        CustomerSubscription subscription = createSubscriptionInternal(customerId, customerEmail, merchantId, planId);
+        
+        log.info("✅ Subscription created: {} for customer {}", subscription.getId(), customerEmail);
+        return subscription;
+    }
+
+    private CustomerSubscription createSubscriptionInternal(Long customerId, String customerEmail,
+                                                            Long merchantId, Long planId) {
+        Long tenantId = TenantContext.getRequiredTenantId();
+        
+        SubscriptionPlan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         CustomerSubscription subscription = new CustomerSubscription();
         subscription.setPlan(plan);
@@ -121,7 +272,7 @@ public class SubscriptionService {
 
         CustomerSubscription saved = subscriptionRepository.save(subscription);
 
-        // Send confirmation email
+        // Send confirmation notification to customer
         notificationService.createNotification(
                 customerId,
                 "SUBSCRIPTION_CREATED",
@@ -130,6 +281,7 @@ public class SubscriptionService {
                 "/subscriptions/my"
         );
 
+        // Send notification to merchant
         notificationService.createNotification(
                 merchantId,
                 "NEW_SUBSCRIPTION",
@@ -168,7 +320,7 @@ public class SubscriptionService {
                     false,
                     newPlan.getCurrency()
             );
-            log.info("Prorated invoice #{} created for upgrade", invoice.getId());
+            log.info("✅ Prorated invoice #{} created for upgrade", invoice.getId());
         }
 
         // Update subscription
@@ -195,6 +347,7 @@ public class SubscriptionService {
                 "/merchant/subscriptions"
         );
 
+        log.info("⬆️ Subscription {} upgraded from {} to {}", subscriptionId, oldPlan.getName(), newPlan.getName());
         return updated;
     }
 
@@ -222,6 +375,7 @@ public class SubscriptionService {
                 "/subscriptions/my"
         );
 
+        log.info("⬇️ Subscription {} downgraded to {}", subscriptionId, newPlan.getName());
         return updated;
     }
 
@@ -268,7 +422,7 @@ public class SubscriptionService {
                 "/subscriptions/my"
         );
 
-        log.info("Subscription {} cancelled", subscriptionId);
+        log.info("❌ Subscription {} cancelled", subscriptionId);
     }
 
     // ============================================================
@@ -297,7 +451,7 @@ public class SubscriptionService {
                 successCount++;
             } catch (Exception e) {
                 failCount++;
-                log.error("Failed to process billing for subscription {}: {}",
+                log.error("❌ Failed to process billing for subscription {}: {}",
                         subscription.getId(), e.getMessage());
 
                 // Create retry entry
@@ -351,7 +505,7 @@ public class SubscriptionService {
         retry.setNextAttemptAt(LocalDateTime.now().plusHours(24));
         paymentRetryRepository.save(retry);
 
-        log.info("Retry created for subscription {}: attempt 1/3", subscription.getId());
+        log.info("⏳ Retry created for subscription {}: attempt 1/3", subscription.getId());
     }
 
     @Scheduled(cron = "0 0 6 * * *")  // Daily at 6 AM
@@ -409,7 +563,7 @@ public class SubscriptionService {
                 }
                 retry.setErrorMessage(e.getMessage());
                 paymentRetryRepository.save(retry);
-                log.error("Retry failed for subscription {}: {}", retry.getSubscriptionId(), e.getMessage());
+                log.error("❌ Retry failed for subscription {}: {}", retry.getSubscriptionId(), e.getMessage());
             }
         }
     }
@@ -417,6 +571,11 @@ public class SubscriptionService {
     // ============================================================
     // QUERY METHODS
     // ============================================================
+
+    public CustomerSubscription getSubscriptionById(Long id) {
+        return subscriptionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+    }
 
     public List<CustomerSubscription> getCustomerSubscriptions(Long customerId) {
         return subscriptionRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
@@ -426,31 +585,47 @@ public class SubscriptionService {
         return subscriptionRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId);
     }
 
-    public Map<String, Object> getMerchantStats(Long merchantId) {
-        long activeCount = subscriptionRepository.countByMerchantIdAndStatus(
-                merchantId, CustomerSubscription.SubscriptionStatus.ACTIVE
-        );
-        long trialingCount = subscriptionRepository.countByMerchantIdAndStatus(
-                merchantId, CustomerSubscription.SubscriptionStatus.TRIALING
-        );
-
-        List<CustomerSubscription> subscriptions = subscriptionRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId);
-        BigDecimal totalRevenue = subscriptions.stream()
-                .filter(s -> s.getStatus() == CustomerSubscription.SubscriptionStatus.ACTIVE)
-                .map(s -> s.getPlan().getPrice())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("activeSubscriptions", activeCount);
-        stats.put("trialingSubscriptions", trialingCount);
-        stats.put("totalSubscriptions", subscriptions.size());
-        stats.put("monthlyRevenue", totalRevenue);
-        stats.put("annualRevenue", totalRevenue.multiply(BigDecimal.valueOf(12)));
-
-        return stats;
-    }
-
     public Page<CustomerSubscription> getMerchantSubscriptionsPaginated(Long merchantId, Pageable pageable) {
         return subscriptionRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId, pageable);
+    }
+
+    public Map<String, Object> getMerchantStats(Long merchantId) {
+        Map<String, Object> stats = new HashMap<>();
+
+        try {
+            long activeCount = subscriptionRepository.countByMerchantIdAndStatus(
+                    merchantId, CustomerSubscription.SubscriptionStatus.ACTIVE
+            );
+            long trialingCount = subscriptionRepository.countByMerchantIdAndStatus(
+                    merchantId, CustomerSubscription.SubscriptionStatus.TRIALING
+            );
+            long pendingRequests = requestRepository.countByMerchantIdAndStatus(
+                    merchantId, SubscriptionRequest.RequestStatus.PENDING
+            );
+
+            List<CustomerSubscription> subscriptions = subscriptionRepository.findByMerchantIdOrderByCreatedAtDesc(merchantId);
+            BigDecimal totalRevenue = subscriptions.stream()
+                    .filter(s -> s.getStatus() == CustomerSubscription.SubscriptionStatus.ACTIVE)
+                    .map(s -> s.getPlan().getPrice())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            stats.put("activeSubscriptions", activeCount);
+            stats.put("trialingSubscriptions", trialingCount);
+            stats.put("totalSubscriptions", (long) subscriptions.size());
+            stats.put("monthlyRevenue", totalRevenue);
+            stats.put("annualRevenue", totalRevenue.multiply(BigDecimal.valueOf(12)));
+            stats.put("pendingRequests", pendingRequests);
+
+        } catch (Exception e) {
+            log.error("Error getting merchant stats: {}", e.getMessage());
+            stats.put("activeSubscriptions", 0L);
+            stats.put("trialingSubscriptions", 0L);
+            stats.put("totalSubscriptions", 0L);
+            stats.put("monthlyRevenue", BigDecimal.ZERO);
+            stats.put("annualRevenue", BigDecimal.ZERO);
+            stats.put("pendingRequests", 0L);
+        }
+
+        return stats;
     }
 }

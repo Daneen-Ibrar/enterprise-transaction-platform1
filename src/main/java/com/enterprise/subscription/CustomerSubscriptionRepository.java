@@ -1,5 +1,7 @@
 package com.enterprise.subscription;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;  // ✅ ADD THIS IMPORT
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +18,9 @@ public interface CustomerSubscriptionRepository extends JpaRepository<CustomerSu
 
     List<CustomerSubscription> findByMerchantIdOrderByCreatedAtDesc(Long merchantId);
 
-    Optional<CustomerSubscription> findByCustomerIdAndPlanIdAndStatus(Long customerId, Long planId, CustomerSubscription.SubscriptionStatus status);
+    // ✅ FIXED: Added Pageable import
+    Page<CustomerSubscription> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
+
 
     @Query("SELECT s FROM CustomerSubscription s WHERE s.status = 'ACTIVE' AND s.nextBillingDate <= :date")
     List<CustomerSubscription> findActiveSubscriptionsDueForBilling(@Param("date") LocalDateTime date);
@@ -29,8 +33,23 @@ public interface CustomerSubscriptionRepository extends JpaRepository<CustomerSu
     @Modifying
     @Transactional
     @Query("UPDATE CustomerSubscription s SET s.status = :status, s.updatedAt = :updatedAt WHERE s.id = :id")
-    void updateStatus(@Param("id") Long id, @Param("status") CustomerSubscription.SubscriptionStatus status, @Param("updatedAt") LocalDateTime updatedAt);
+    void updateStatus(@Param("id") Long id,
+                      @Param("status") CustomerSubscription.SubscriptionStatus status,
+                      @Param("updatedAt") LocalDateTime updatedAt);
 
-    age<CustomerSubscription> findByMerchantIdOrderByCreatedAtDesc(Long merchantId, Pageable pageable);
+    // ============================================================
+    // ADDITIONAL QUERY METHODS
+    // ============================================================
 
+    Optional<CustomerSubscription> findByCustomerIdAndPlanIdAndStatus(
+        Long customerId, Long planId, CustomerSubscription.SubscriptionStatus status);
+
+    @Query("SELECT COUNT(s) FROM CustomerSubscription s WHERE s.tenantId = :tenantId AND s.status = :status")
+    long countByTenantIdAndStatus(@Param("tenantId") Long tenantId,
+                                  @Param("status") CustomerSubscription.SubscriptionStatus status);
+
+    @Query("SELECT COUNT(s) FROM CustomerSubscription s WHERE s.tenantId = :tenantId AND s.createdAt BETWEEN :start AND :end")
+    long countByTenantIdAndCreatedAtBetween(@Param("tenantId") Long tenantId,
+                                            @Param("start") LocalDateTime start,
+                                            @Param("end") LocalDateTime end);
 }

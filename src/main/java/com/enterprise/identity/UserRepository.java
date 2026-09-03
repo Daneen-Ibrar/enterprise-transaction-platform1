@@ -24,6 +24,13 @@ public interface UserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByRolesName(String roleName);
 
+    // ✅ ADD THIS METHOD - Find users by tenant ID and role name
+    @Query("SELECT u FROM AppUser u JOIN u.roles r WHERE u.tenantId = :tenantId AND r.name = :roleName")
+    List<AppUser> findByTenantIdAndRoleName(@Param("tenantId") Long tenantId, @Param("roleName") String roleName);
+
+    // ✅ ADD THIS METHOD - Find users by tenant ID only
+    List<AppUser> findByTenantId(Long tenantId);
+
     @Query(value = "SELECT * FROM app_user", nativeQuery = true)
     List<AppUser> findAllWithoutTenantFilter();
 

@@ -376,9 +376,6 @@
             <a href="/invoices/create">📄 Create Invoice</a>
         </li>
         <li sec:authorize="hasRole('MERCHANT')">
-    <a href="/merchant/recurring">📆 Recurring Invoices</a>
-</li>
-        <li sec:authorize="hasRole('MERCHANT')">
             <a href="/invoices/merchant">📋 My Invoices</a>
         </li>
 
@@ -413,6 +410,14 @@
         <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')">
     <a href="/admin/api-keys/monitor">🔑 API Key Monitor</a>
 </li>
+  <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'MERCHANT_ADMIN')">
+        <a href="/admin/tax">💰 Tax Rules</a>
+    </li>
+
+    <li sec:authorize="hasRole('MERCHANT')">
+    <a href="/merchant/subscriptions">📊 Subscription Dashboard</a>
+</li>
+
         <li sec:authorize="hasRole('ADMIN')">
             <a href="/admin/tenants">🏢 Manage Tenants</a>
         </li>

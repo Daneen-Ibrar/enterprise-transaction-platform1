@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Customer Subscriptions</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .nav-tabs { display: flex; gap: 5px; margin: 20px 0; border-bottom: 2px solid #ddd; flex-wrap: wrap; }
+        .nav-tabs a { padding: 10px 20px; text-decoration: none; color: #555; border-radius: 4px 4px 0 0; }
+        .nav-tabs a.active { background: #2d7a3a; color: white; }
+        .nav-tabs a:hover { background: #e9ecef; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin: 20px 0; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f2f2f2; }
+        .badge { padding: 4px 12px; border-radius: 12px; color: white; font-size: 12px; display: inline-block; }
+        .badge-active { background: #2d7a3a; }
+        .badge-trialing { background: #f39c12; }
+        .badge-cancelled { background: #95a5a6; }
+        .back-link { color: #007bff; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .flash-success { background: #d4edda; padding: 12px; border-radius: 4px; color: #155724; margin: 10px 0; }
+        .flash-error { background: #f8d7da; padding: 12px; border-radius: 4px; color: #721c24; margin: 10px 0; }
+        .flash-warning { background: #fff3cd; padding: 12px; border-radius: 4px; color: #856404; margin: 10px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>👥 Customer Subscriptions</h1>
+    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+
+    <!-- Flash Messages -->
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+    <div th:if="${warning}" class="flash-warning" th:text="${warning}"></div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+        <a href="/merchant/subscriptions">📊 Dashboard</a>
+        <a href="/merchant/subscriptions/plans">📋 Plans</a>
+        <a href="/merchant/subscriptions/customers" class="active">👥 Customers</a>
+    </div>
+
+    <!-- Customers List -->
+    <div class="card">
+        <h3>📋 All Customers</h3>
+        
+        <div th:if="${subscriptions != null and !subscriptions.isEmpty()}">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Customer Email</th>
+                        <th>Plan</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Start Date</th>
+                        <th>Next Billing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="sub : ${subscriptions.content}">
+                        <td th:text="${sub.customerEmail}">customer@test.com</td>
+                        <td th:text="${sub.plan.name}">Basic</td>
+                        <td th:text="${currencyHelper.getFormattedAmount(sub.plan.price, sub.plan.currency)}">£ 9.99</td>
+                        <td>
+                            <span class="badge" 
+                                  th:classappend="${sub.status.name() == 'ACTIVE' ? 'badge-active' : sub.status.name() == 'TRIALING' ? 'badge-trialing' : 'badge-cancelled'}"
+                                  th:text="${sub.status}">Active</span>
+                        </td>
+                        <td th:text="${#temporals.format(sub.startDate, 'yyyy-MM-dd')}">2026-09-01</td>
+                        <td th:text="${#temporals.format(sub.nextBillingDate, 'yyyy-MM-dd')}">2026-09-01</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:unless="${subscriptions != null and !subscriptions.isEmpty()}" class="empty">
+            <p>No customer subscriptions found.</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

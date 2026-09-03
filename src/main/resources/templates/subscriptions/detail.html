@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Subscription Details</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin: 20px 0; }
+        .badge { padding: 4px 12px; border-radius: 12px; color: white; font-size: 12px; display: inline-block; }
+        .badge-active { background: #2d7a3a; }
+        .badge-cancelled { background: #c0392b; }
+        .badge-trial { background: #f39c12; }
+        .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .detail-label { font-weight: bold; width: 180px; }
+        .detail-value { flex: 1; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .back-link { color: #007bff; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .flash-success { background: #d4edda; padding: 12px; border-radius: 4px; color: #155724; margin: 10px 0; }
+        .flash-error { background: #f8d7da; padding: 12px; border-radius: 4px; color: #721c24; margin: 10px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📄 Subscription Details</h1>
+    <a href="/subscriptions/my" class="back-link">← Back to My Subscriptions</a>
+
+    <div th:if="${success}" class="flash-success" th:text="${success}"></div>
+    <div th:if="${error}" class="flash-error" th:text="${error}"></div>
+
+    <div class="card" th:with="sub=${subscription}">
+        <h2 th:text="'Subscription #' + ${sub.id}">Subscription #1</h2>
+        
+        <div class="detail-row">
+            <span class="detail-label">Plan</span>
+            <span class="detail-value" th:text="${sub.plan.name}">Basic Plan</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Description</span>
+            <span class="detail-value" th:text="${sub.plan.description}">Description</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Billing Period</span>
+            <span class="detail-value" th:text="${sub.plan.billingPeriod}">MONTHLY</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Price</span>
+            <span class="detail-value" th:text="${currencyHelper.getFormattedAmount(sub.plan.price, sub.plan.currency)}">£ 9.99</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Status</span>
+            <span class="detail-value">
+                <span class="badge" 
+                      th:classappend="${sub.status.name() == 'ACTIVE' ? 'badge-active' : sub.status.name() == 'TRIALING' ? 'badge-trial' : 'badge-cancelled'}"
+                      th:text="${sub.status}">Active</span>
+            </span>
+        </div>
+        <div class="detail-row" th:if="${sub.isOnTrial()}">
+            <span class="detail-label">Trial Ends</span>
+            <span class="detail-value" th:text="${#temporals.format(sub.trialEndDate, 'yyyy-MM-dd HH:mm')}">2026-09-01 12:00</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Start Date</span>
+            <span class="detail-value" th:text="${#temporals.format(sub.startDate, 'yyyy-MM-dd HH:mm')}">2026-08-01 12:00</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Next Billing Date</span>
+            <span class="detail-value" th:text="${#temporals.format(sub.nextBillingDate, 'yyyy-MM-dd HH:mm')}">2026-09-01 12:00</span>
+        </div>
+        <div class="detail-row" th:if="${sub.lastBillingDate != null}">
+            <span class="detail-label">Last Billing Date</span>
+            <span class="detail-value" th:text="${#temporals.format(sub.lastBillingDate, 'yyyy-MM-dd HH:mm')}">2026-08-01 12:00</span>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <form method="post" th:action="'/subscriptions/' + ${sub.id} + '/cancel'">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <button type="submit" class="btn btn-danger" 
+                        th:if="${sub.status.name() == 'ACTIVE' or sub.status.name() == 'TRIALING'}"
+                        onclick="return confirm('Are you sure you want to cancel this subscription?')">
+                    Cancel Subscription
+                </button>
+            </form>
+            <a href="/subscriptions/my" class="btn btn-secondary">Back</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>
